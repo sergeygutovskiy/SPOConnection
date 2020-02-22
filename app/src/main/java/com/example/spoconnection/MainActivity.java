@@ -34,6 +34,9 @@ public class MainActivity extends AppCompatActivity {
     public JSONObject exercisesVisits;
     public JSONObject teachers;
 
+    public JSONArray todayExercises; // не обязательно today, лол
+    public JSONObject todayExercisesVisits; // не обязательно today, лол
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
@@ -41,8 +44,8 @@ public class MainActivity extends AppCompatActivity {
 
         String[] loginParams = {
                 "https://ifspo.ifmo.ru/",
-                "name",
-                "password"
+                "герман",
+                "пароль германа"
         };
         sendLoginRequest(loginParams);
     }
@@ -53,7 +56,7 @@ public class MainActivity extends AppCompatActivity {
 
       Нельзя изменять функцию
     */
-    public void sendLoginRequest(String[] params) {
+    private void sendLoginRequest(String[] params) {
         loginRequest request = new loginRequest();
         request.execute(params);
     }
@@ -64,8 +67,19 @@ public class MainActivity extends AppCompatActivity {
 
         Нельзя изменять функцию
     */
-    public void sendGetStudentMainDataRequest(String[] params) {
+    private void sendGetStudentMainDataRequest(String[] params) {
         getStudentMainDataRequest request = new getStudentMainDataRequest();
+        request.execute(params);
+    }
+
+    /*
+        Отпраить завпрос на получение данных о парах за определенный день
+        String[] params = {url, data, cookie}
+
+        Нельзя изменять функцию
+    */
+    private void sendGetExercisesByDayRequest(String[] params) {
+        getExercisesByDayRequest request = new getExercisesByDayRequest();
         request.execute(params);
     }
 
@@ -80,6 +94,7 @@ public class MainActivity extends AppCompatActivity {
         if (cookie != "") {
             System.out.println("Login success!");
             authCookie = cookie;
+            System.out.println("AuthCookie: " + authCookie);
 
             String[] requestParams = {
                     "https://ifspo.ifmo.ru/profile/getStudentLessonsVisits",
@@ -87,7 +102,7 @@ public class MainActivity extends AppCompatActivity {
             };
             sendGetStudentMainDataRequest(requestParams);
         } else {
-            System.out.println("Login failure");
+            System.out.println("Login failure!");
         }
     }
 
@@ -101,7 +116,7 @@ public class MainActivity extends AppCompatActivity {
     */
     public void onGetStudentMainDataRequestCompleted(String responseBody) {
         if (responseBody != "") {
-            System.out.println("GetStudentMainData Success");
+            System.out.println("GetStudentMainData Success!");
             JSONObject jsonData;
             try {
                 jsonData = new JSONObject(responseBody);
@@ -111,13 +126,46 @@ public class MainActivity extends AppCompatActivity {
                 exercisesVisits = jsonData.getJSONObject("ExercisesVisits");
                 teachers = jsonData.getJSONObject("lessonteachers");
 
-                System.out.println(teachers.toString());
+                System.out.println("StudentLessons: " + studentLessons.toString());
+                System.out.println("Exercises: " + exercises.toString());
+                System.out.println("ExercisesVisits: " + exercisesVisits.toString());
+                System.out.println("Teachers: " + teachers.toString());
+
+                String[] params = {
+                        "https://ifspo.ifmo.ru//journal/getStudentExercisesByDay",
+                        "2020-02-22",
+                        authCookie
+                };
+                sendGetExercisesByDayRequest(params);
 
             } catch (JSONException e) {
 
             }
         } else {
-            System.out.println("GetStudentMainData Failure");
+            System.out.println("GetStudentMainData Failure!");
+        }
+    }
+
+    /*
+        Callback, когда запрос на получение данных по парам за определенный день завершился
+    */
+    public void onGetExercisesByDayRequestCompleted (String responseBody) {
+        if (responseBody != "") {
+            System.out.println("GetExercisesByDay Success!");
+            JSONObject jsonData;
+            try {
+                jsonData = new JSONObject(responseBody);
+
+                todayExercises = jsonData.getJSONArray("todayExercises");
+                todayExercisesVisits = jsonData.getJSONObject("todayExercisesVisits");
+
+                System.out.println("TodayExercises: " + todayExercises.toString());
+                System.out.println("TodayExercisesVisits: " + todayExercisesVisits.toString());
+            } catch (JSONException e) {
+
+            }
+        } else {
+            System.out.println("GetExercisesByDay Failure!");
         }
     }
 
@@ -236,6 +284,64 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
             onGetStudentMainDataRequestCompleted(result);
+        }
+    }
+
+    /*
+        Еще один ассинхронный класс
+        В нем менять ничего не нужно
+    */
+    class getExercisesByDayRequest extends AsyncTask <String[], Void, String> {
+        protected String doInBackground(String[]... params) {
+            URL url;
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+
+            String[] decoded_cookie = URLDecoder.decode(params[0][2]).split("s:");
+            String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
+            String studentId = userIdDirty.substring(1, userIdDirty.length() - 2);
+
+            try {
+                String url_address = params[0][0] + "?student=" + studentId + "&day=" + params[0][1];
+                url = new URL(url_address);
+                urlConnection = (HttpURLConnection) url.openConnection();
+
+                urlConnection.setRequestMethod("GET");
+                urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
+                urlConnection.setRequestProperty("Cookie", params[0][2]);
+                urlConnection.setUseCaches(false);
+                urlConnection.setInstanceFollowRedirects(false);
+
+                BufferedReader in = new BufferedReader(
+                        new InputStreamReader(urlConnection.getInputStream())
+                );
+
+                StringBuilder response = new StringBuilder();
+                String currentLine;
+
+                try {
+                    while ((currentLine = in.readLine()) != null)
+                        response.append(currentLine);
+
+                    in.close();
+                } catch (IOException e) {
+                    System.out.println(e.toString());
+                }
+                responseBody = response.toString();
+            } catch (Exception e) {
+                System.out.println("Problems with getExercisesByDay request");
+                System.out.println(e.toString());
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
+            }
+            return responseBody;
+        }
+
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            onGetExercisesByDayRequestCompleted(result);
         }
     }
 }
