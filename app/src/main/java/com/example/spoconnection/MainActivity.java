@@ -76,7 +76,8 @@ public class MainActivity extends AppCompatActivity {
     public Integer exercisesByLessonAmount;
     public Integer exercisesByLessonVisitsAmount;
 
-    public JSONObject readyExercisesByLesson;
+    public JSONObject readyExercisesByLesson = new JSONObject();
+    public JSONObject readyExercisesByLessonVisits = new JSONObject();
 
     // by vk api
     public JSONObject vkWallPosts;
@@ -393,7 +394,16 @@ public class MainActivity extends AppCompatActivity {
                     e.printStackTrace();
                 }
             }
-//            readyExercisesByLesson.put()
+
+            try {
+                readyExercisesByLesson.put(lessonId, exercisesByLesson);
+                readyExercisesByLessonVisits.put(lessonId, exercisesByLessonVisits);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            System.out.println("readyExercisesByLesson: "  + readyExercisesByLesson.toString());
+            System.out.println("readyExercisesByLessonVisits: "  + readyExercisesByLessonVisits.toString());
 
         } else {
             getExercisesByLessonRequestStatus = RequestStatus.EMPTY_RESPONSE;
@@ -1030,8 +1040,6 @@ public class MainActivity extends AppCompatActivity {
         public void onClick(View v)
         {
 
-            sendGetExercisesByLessonRequest(new String[] {v.getId()+""});
-
             // обновляем активный экран
 
             main.removeView(lessonsScreen);
@@ -1044,6 +1052,79 @@ public class MainActivity extends AppCompatActivity {
             // очищаем scrollview
 
             lessonsInformationList.removeAllViews();
+
+            JSONArray buffer = null;
+            try {
+                buffer = readyExercisesByLesson.getJSONArray(v.getId()+"");
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+            System.out.println(buffer);
+            if (buffer == null) {
+                sendGetExercisesByLessonRequest(new String[] {v.getId()+""});
+            } else {
+
+
+                for (int k = 0; k < buffer.length(); k++) {
+                    JSONObject value;
+                    try {
+
+                        value = buffer.getJSONObject(k);
+                        TextView temp = new TextView(getApplicationContext());
+                        LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+                        lp.setMargins(0,0,0, 50);
+                        temp.setLayoutParams(lp);
+                        temp.setText(value.getString("topic") + " и эта пара была " + value.getString("day"));
+                        temp.setBackgroundColor(167);
+
+
+                        // получаем подробную информацию о паре
+
+                        JSONObject valueInfo;
+                        try {
+                            valueInfo = readyExercisesByLessonVisits.getJSONArray(value.getString("id")).getJSONObject(0);
+
+                            String presence = valueInfo.getString("presence").equals("0") ? " присутствие: нет " : " присутствие: да ";
+                            String point = valueInfo.getString("point").toString().equals("null")  ? " оценка: нет " : " оценка: да ";
+                            switch (valueInfo.getString("point")) {
+                                case "2": {
+                                    point = " оценка: 2";
+                                    break;
+                                }
+                                case "3": {
+                                    point = " оценка: 3";
+                                    break;
+                                }
+                                case "4": {
+                                    point = " оценка: 4";
+                                    break;
+                                }
+                                case "5": {
+                                    point = " оценка: 5";
+                                    break;
+                                }
+                            }
+                            String delay = valueInfo.getString("delay").toString().equals("null")  ? " опоздание: нет " : " опоздание: да ";
+                            String performance = valueInfo.getString("performance").toString().equals("null") ? " активность: нет " : " активность: да ";
+
+                            temp.setText(temp.getText() + presence + point + delay + performance);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+
+
+                        // опять же id - ключ для следующего массива
+
+                        temp.setId(Integer.parseInt(value.getString("id")));
+                        lessonsInformationList.addView(temp);
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            }
 
         }
 
