@@ -39,11 +39,9 @@ import java.util.List;
     2. Построить праильно вызовы - сделано
     3. Handlers - сделано
     4. Обьект, где будут пары по кажому предмету
-    5. При копировании кода будут ошибки из-за переменных закоменченых - немного подпраил, но не все
+    5. При копировании кода будут ошибки из-за переменных закоменченых - сделано
     6. Main и ByDay одновременно - сделано
-    7. Сейчас при нажатии на какой-то предмет ничего не происходит, как и при нажатии на уведомления - это за тобой
-       Для уведомлений sendGetVKWallPostsRequest(new String[] { 10 })
-       Для отдельного предмета sendGetExercisesByLesson(new String[] { lesson_id })
+    7. Сейчас при нажатии на какой-то предмет ничего не происходит, как и при нажатии на уведомления - сделано
 */
 
 public class MainActivity extends AppCompatActivity {
@@ -77,6 +75,8 @@ public class MainActivity extends AppCompatActivity {
     public JSONObject exercisesByLessonTeacher;
     public Integer exercisesByLessonAmount;
     public Integer exercisesByLessonVisitsAmount;
+
+    public JSONObject readyExercisesByLesson;
 
     // by vk api
     public JSONObject vkWallPosts;
@@ -300,7 +300,10 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void onGetExercisesByLessonRequestCompleted (String responseBody) {
+    public void onGetExercisesByLessonRequestCompleted (String[] response) {
+        String responseBody = response[0];
+        String lessonId = response[1];
+
         if (responseBody != "") {
             getExercisesByLessonRequestStatus = RequestStatus.COMPLETED;
 
@@ -323,6 +326,75 @@ public class MainActivity extends AppCompatActivity {
             } catch (JSONException e) {
 
             }
+
+            // берем нужный предмет
+
+            JSONArray buffer = exercisesByLesson;
+
+
+//             выкидываем информацию о паре
+
+            for (int k = 0; k < buffer.length(); k++) {
+                JSONObject value;
+                try {
+
+                    value = buffer.getJSONObject(k);
+                    TextView temp = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
+                    lp.setMargins(0,0,0, 50);
+                    temp.setLayoutParams(lp);
+                    temp.setText(value.getString("topic") + " и эта пара была " + value.getString("day"));
+                    temp.setBackgroundColor(167);
+
+
+                    // получаем подробную информацию о паре
+
+                    JSONObject valueInfo;
+                    try {
+                        valueInfo = exercisesByLessonVisits.getJSONArray(value.getString("id")).getJSONObject(0);
+
+                        String presence = valueInfo.getString("presence").equals("0") ? " присутствие: нет " : " присутствие: да ";
+                        String point = valueInfo.getString("point").toString().equals("null")  ? " оценка: нет " : " оценка: да ";
+                        switch (valueInfo.getString("point")) {
+                            case "2": {
+                                point = " оценка: 2";
+                                break;
+                            }
+                            case "3": {
+                                point = " оценка: 3";
+                                break;
+                            }
+                            case "4": {
+                                point = " оценка: 4";
+                                break;
+                            }
+                            case "5": {
+                                point = " оценка: 5";
+                                break;
+                            }
+                        }
+                        String delay = valueInfo.getString("delay").toString().equals("null")  ? " опоздание: нет " : " опоздание: да ";
+                        String performance = valueInfo.getString("performance").toString().equals("null") ? " активность: нет " : " активность: да ";
+
+                        temp.setText(temp.getText() + presence + point + delay + performance);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+
+                    LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
+
+                    // опять же id - ключ для следующего массива
+
+                    temp.setId(Integer.parseInt(value.getString("id")));
+                    lessonsInformationList.addView(temp);
+
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+            }
+//            readyExercisesByLesson.put()
+
         } else {
             getExercisesByLessonRequestStatus = RequestStatus.EMPTY_RESPONSE;
             System.out.println("GetExercisesByLesson Failure!");
@@ -346,9 +418,44 @@ public class MainActivity extends AppCompatActivity {
 
             }
 
-            // создание фронтенда по полученным данным
+            JSONArray value;
+            try {
+                value = vkWallPosts.getJSONArray("items");
 
-            buildFrontend();
+                for (int i = 0; i < value.length(); i++) {
+
+                    // берем каждый пост
+
+                    JSONObject tmp;
+                    try {
+                        tmp = value.getJSONObject(i);
+
+                        //и выкидывем его на форму
+                        long stamp = System.currentTimeMillis()/1000;
+                        System.out.println("current time: " + stamp);
+
+                        //и выкидывем его на форму если он моложе двух дней
+
+                        if (stamp - Long.parseLong(tmp.getString("date")) <= 2*24*3600) {
+
+                            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            lp.setMargins(25, 25, 25, 50);
+                            TextView note = new TextView(getApplicationContext());
+                            note.setLayoutParams(lp);
+                            note.setText( (i+1) + " пост (" + new Date(Long.parseLong(tmp.getString("date"))*1000 + 3*3600*1000) + "):    " + tmp.getString("text"));
+                            LinearLayout notificationList = findViewById(R.id.notificationList);
+                            notificationList.addView(note);
+                        }
+
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                }
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
         } else {
             getVKWallPostsRequestStatus = RequestStatus.EMPTY_RESPONSE;
             System.out.println("GetVKWallPosts Failure!");
@@ -474,8 +581,8 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // [lessonId]
-    class getExercisesByLessonRequest extends AsyncTask <String[], Void, String> {
-        protected String doInBackground(String[]... params) { // params[0][0] - lesson_id (String)
+    class getExercisesByLessonRequest extends AsyncTask <String[], Void, String[]> {
+        protected String[] doInBackground(String[]... params) { // params[0][0] - lesson_id (String)
             URL url;
             HttpURLConnection urlConnection = null;
             String responseBody = "";
@@ -516,10 +623,10 @@ public class MainActivity extends AppCompatActivity {
                     urlConnection.disconnect();
                 }
             }
-            return responseBody;
+            return new String[] {responseBody, params[0][0]};
         }
 
-        protected void onPostExecute(String result) {
+        protected void onPostExecute(String[] result) {
             super.onPostExecute(result);
             onGetExercisesByLessonRequestCompleted(result);
         }
@@ -675,11 +782,8 @@ public class MainActivity extends AppCompatActivity {
             GetStudentMainData (этот или прошлый год) главное, что вернет все предметы, которые и будут выводится в списке
         LESSONS_INFORMATION
             GetExercisesByLesson (айди предмета) вернет все пары по этому предмету
-
         В общем, все нормально, кроме вывода информации по парам для каждого предмета
         Потому что использу.тся переменные exercises, exercisesVisits (с getStudentMainDataRequest) кторые показывают пары только за текущий месяц.
-
-
     */
 
 
@@ -905,45 +1009,15 @@ public class MainActivity extends AppCompatActivity {
 
             // но если кликнута кнопка изменений в расписании, нужно еще выкинуть контент от вк
 
-            /*
+
 
             if (activeContainer == ContainerName.NOTIFICATION) {
 
-                // берем массив
+                sendGetVKWallPostsRequest(new String[] {"10"});
 
-                JSONArray value;
-                try {
-                    value = vkWallPosts.getJSONArray("items");
-
-                    for (int i = 0; i < value.length(); i++) {
-
-                        // берем каждый пост
-
-                        JSONObject tmp;
-                        try {
-                            tmp = value.getJSONObject(i);
-
-                            //и выкидывем его на форму
-
-                            LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                            lp.setMargins(25, 25, 25, 50);
-                            TextView note = new TextView(getApplicationContext());
-                            note.setLayoutParams(lp);
-                            note.setText( (i+1) + " пост:    " + tmp.getString("text"));
-                            LinearLayout notificationList = findViewById(R.id.notificationList);
-                            notificationList.addView(note);
-
-                        } catch (JSONException e) {
-                            e.printStackTrace();
-                        }
-                    }
-
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
             }
 
-            */
+
 
         }
 
@@ -956,7 +1030,7 @@ public class MainActivity extends AppCompatActivity {
         public void onClick(View v)
         {
 
-            /*
+            sendGetExercisesByLessonRequest(new String[] {v.getId()+""});
 
             // обновляем активный экран
 
@@ -970,76 +1044,6 @@ public class MainActivity extends AppCompatActivity {
             // очищаем scrollview
 
             lessonsInformationList.removeAllViews();
-
-            // берем нужный предмет
-
-            JSONArray buffer = null;
-            try {
-                buffer = exercises.getJSONArray(v.getId() + "");
-            } catch (JSONException e) {
-                e.printStackTrace();
-            }
-
-
-            // выкидываем информацию о паре
-
-            for (int k = 0; k < buffer.length(); k++) {
-                JSONObject value;
-                try {
-                    value = buffer.getJSONObject(k);
-                    TextView temp = new TextView(getApplicationContext());
-                    //
-                    LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 150);
-                    lp.setMargins(0,0,0, 50);
-                    temp.setLayoutParams(lp);
-                    temp.setText(value.getString("topic") + " и это пара была " + value.getString("day"));
-                    temp.setBackgroundColor(167);
-
-                    // получаем подробную информацию о паре
-
-                    JSONObject valueInfo;
-                    try {
-                        valueInfo = exercisesVisits.getJSONObject(v.getId() + "").getJSONArray(value.getString("id")).getJSONObject(0);
-
-                        String presence = valueInfo.getString("presence").equals("0") ? " присутствие: нет " : " присутствие: да ";
-                        String point = valueInfo.getString("point").toString().equals("null")  ? " оценка: нет " : " оценка: да ";
-                        switch (valueInfo.getString("point")) {
-                            case "2": {
-                                point = " оценка: 2";
-                                break;
-                            }
-                            case "3": {
-                                point = " оценка: 3";
-                                break;
-                            }
-                            case "4": {
-                                point = " оценка: 4";
-                                break;
-                            }
-                            case "5": {
-                                point = " оценка: 5";
-                                break;
-                            }
-                        }
-                        String delay = valueInfo.getString("delay").toString().equals("null")  ? " опоздание: нет " : " опоздание: да ";
-                        String performance = valueInfo.getString("performance").toString().equals("null") ? " активность: нет " : " активность: да ";
-
-                        temp.setText(temp.getText() + presence + point + delay + performance);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-
-
-                    // опять же id - ключ для следующего массива
-
-                    temp.setId(Integer.parseInt(value.getString("id")));
-                    lessonsInformationList.addView(temp);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-            }
-
-            */
 
         }
 
