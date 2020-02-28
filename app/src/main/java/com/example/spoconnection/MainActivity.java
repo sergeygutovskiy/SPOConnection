@@ -3,6 +3,8 @@ package com.example.spoconnection;
 
 import androidx.appcompat.app.AppCompatActivity;
 
+import android.content.Context;
+import android.content.SharedPreferences;
 import android.os.Bundle;
 import android.os.AsyncTask;
 import android.view.View;
@@ -18,6 +20,10 @@ import com.google.android.material.textfield.TextInputEditText;
 import org.json.JSONException;
 import org.json.JSONObject;
 import org.json.JSONArray;
+import org.jsoup.Jsoup;
+import org.jsoup.nodes.Document;
+import org.jsoup.nodes.Element;
+import org.jsoup.select.Elements;
 
 import java.io.BufferedReader;
 import java.io.DataOutputStream;
@@ -29,9 +35,13 @@ import java.net.URLDecoder;
 
 import java.nio.charset.Charset;
 
+import java.text.ParseException;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 import java.util.List;
+
+//import com.example.spoconnection.Functions;
+
 
 /*
     TODO
@@ -101,10 +111,17 @@ public class MainActivity extends AppCompatActivity {
     RequestStatus getExercisesByDayRequestStatus = RequestStatus.NOT_CALLED;
     RequestStatus getExercisesByLessonRequestStatus = RequestStatus.NOT_CALLED;
     RequestStatus getVKWallPostsRequestStatus = RequestStatus.NOT_CALLED;
+    RequestStatus getProfileParsingRequestStatus = RequestStatus.NOT_CALLED;
+    RequestStatus getScheduleParsingRequestStatus = RequestStatus.NOT_CALLED;
 
 
     // Переменная, чтобы buildFrontend не вызвался дважды (и после getMainData и после getByDay)
     Boolean buildFrontendCalled = false;
+
+    Boolean nowWeekScheduleCalled = false;
+    Boolean nextWeekScheduleCalled = false;
+
+    Boolean appFirstRun = false;
 
 
     // контейнеры
@@ -119,6 +136,16 @@ public class MainActivity extends AppCompatActivity {
     public RelativeLayout lessonsInformationScreen;
     public LinearLayout userHelpScreen;
     public LinearLayout notificationListScreen;
+
+
+    // массив расписания
+    JSONObject scheduleLessons = new JSONObject();
+
+    // номер группы пользователя
+    String groupNumber;
+
+    SharedPreferences preferences;
+    SharedPreferences.Editor preferencesEditor;
 
 
     @Override
@@ -143,6 +170,38 @@ public class MainActivity extends AppCompatActivity {
         userHelpScreen = findViewById(R.id.userHelp);
         notificationListScreen = findViewById(R.id.notificationListScreen);
 
+        // локальные кнопки экранов
+
+        scheduleChanges = findViewById(R.id.notificationSchedule);
+        scheduleNow = findViewById(R.id.now);
+        scheduleNext = findViewById(R.id.next);
+
+        // запросы для расписания отправляются только 1 раз
+
+        scheduleNow.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!nowWeekScheduleCalled) {
+                    sendGetScheduleParsingRequest("now");
+                    nowWeekScheduleCalled = true;
+                } else {
+                    onGetScheduleParsingRequestCompleted("now");
+                }
+            }
+        });
+
+        scheduleNext.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                if (!nextWeekScheduleCalled) {
+                    sendGetScheduleParsingRequest("next");
+                    nextWeekScheduleCalled = true;
+                } else {
+                    onGetScheduleParsingRequestCompleted("next");
+                }
+            }
+        });
+
 
         // в начале убираем все экраны
 
@@ -154,6 +213,53 @@ public class MainActivity extends AppCompatActivity {
         main.removeView(lessonsInformationScreen);
         main.removeView(userHelpScreen);
         main.removeView(notificationListScreen);
+
+
+        preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+
+        appFirstRun = preferences.getBoolean("appFirstRun", true);
+        // первый запуск
+        if (appFirstRun) {
+            preferencesEditor = preferences.edit();
+
+            preferencesEditor.putBoolean("appFirstRun", false);
+            preferencesEditor.apply();
+        } else {
+            String lastLoginRequestTime = preferences.getString("lastLoginRequest", "");
+
+            // есть дата последнего входа в аккаунт
+            if (!lastLoginRequestTime.isEmpty()) {
+                Date loginRequestDate = null;
+                Date currentDate;
+
+                try { loginRequestDate = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss").parse(lastLoginRequestTime); }
+                catch (ParseException e) {}
+                currentDate = new Date();
+
+                // вход был выполнен более 100 минут назад, тогда нужно сделать запрос заново
+                if ( ((currentDate.getTime() * 1000 * 60) - (loginRequestDate.getTime() * 1000 * 60) >= 100)) {
+                    String name = preferences.getString("studentName", "");
+                    String password = preferences.getString("studentPassword", "");
+
+                    sendLoginRequest(new String[] { name, password });
+                // иначе пропускаем вход в аккаунт
+                } else {
+                    authCookie = preferences.getString("authCookie", "");
+
+                    // загружаем предметы, учителей и пары за сегодня
+
+                    String year = new SimpleDateFormat("yyyy").format(currentDate);
+                    String month = new SimpleDateFormat("MM").format(currentDate);
+                    String day = new SimpleDateFormat("dd").format(currentDate);
+
+                    sendGetStudentMainDataRequest(new String[]{ year, month });
+                    sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
+                    sendGetProfileParsingRequest();
+
+                }
+
+            }
+        }
 
         // получаем данные для отправки запроса
 
@@ -210,11 +316,26 @@ public class MainActivity extends AppCompatActivity {
         request.execute(params);
     }
 
+    private void sendGetProfileParsingRequest() {
+        getProfileParsingRequest request = new getProfileParsingRequest();
+        getProfileParsingRequestStatus = RequestStatus.CALLED;
+        request.execute();
+    }
+
+    private void sendGetScheduleParsingRequest(String param) {
+        getScheduleParsingRequest request = new getScheduleParsingRequest();
+        getScheduleParsingRequestStatus = RequestStatus.CALLED;
+        request.execute(new String[] {param});
+    }
 
 
     // Колбеки, которые вызываются при завершении определенного запроса
 
-    public void onLoginRequestCompleted(String cookie) {
+    public void onLoginRequestCompleted(String[] params) {
+        String cookie = params[0];
+        String studentName = params[1];
+        String studentPassword = params[2];
+
         if (cookie != "") {
             loginRequestStatus = RequestStatus.COMPLETED;
 
@@ -222,6 +343,16 @@ public class MainActivity extends AppCompatActivity {
 
             System.out.println("Login success!");
             System.out.println("AuthCookie: " + authCookie);
+
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
+
+            String currentDate = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss").format(new Date());
+            preferencesEditor.putString("lastLoginRequest", currentDate);
+            preferencesEditor.putString("authCookie", authCookie);
+            preferencesEditor.putString("studentName", studentName);
+            preferencesEditor.putString("studentPassword", studentPassword);
+            preferencesEditor.apply();
 
             // После входа в акк загружаем предметы, учителей и пары за сегодня
 
@@ -232,6 +363,7 @@ public class MainActivity extends AppCompatActivity {
 
             sendGetStudentMainDataRequest(new String[]{ year, month });
             sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
+            sendGetProfileParsingRequest();
 
         } else {
             loginRequestStatus = RequestStatus.EMPTY_RESPONSE;
@@ -258,7 +390,7 @@ public class MainActivity extends AppCompatActivity {
 //                System.out.println("ExercisesVisits: " + exercisesVisits.toString());
                 System.out.println("Teachers: " + teachers.toString());
 
-                if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
+                if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && getProfileParsingRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
                     buildFrontendCalled = true;
                     buildFrontend();
                 }
@@ -287,7 +419,7 @@ public class MainActivity extends AppCompatActivity {
                 System.out.println("TodayExercises: " + exercisesByDay.toString());
                 System.out.println("TodayExercisesVisits: " + exercisesVisitsByDay.toString());
 
-                if (getStudentMainDataRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
+                if (getStudentMainDataRequestStatus == RequestStatus.COMPLETED && getProfileParsingRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
                     buildFrontendCalled = true;
                     buildFrontend();
                 }
@@ -305,7 +437,7 @@ public class MainActivity extends AppCompatActivity {
         String responseBody = response[0];
         String lessonId = response[1];
 
-        if (responseBody != "") {
+        if (responseBody != "" && activeContainer == ContainerName.LESSONS_INFORMATION) {
             getExercisesByLessonRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetExercisesByLesson Success!");
@@ -412,7 +544,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetVKWallPostsRequestCompleted (String responseBody) {
-        if (responseBody != "") {
+        if (responseBody != "" && activeContainer == ContainerName.NOTIFICATION) {
             getVKWallPostsRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetVKWallPosts Success!");
@@ -445,7 +577,6 @@ public class MainActivity extends AppCompatActivity {
                         System.out.println("current time: " + stamp);
 
                         //и выкидывем его на форму если он моложе двух дней
-
                         if (stamp - Long.parseLong(tmp.getString("date")) <= 2*24*3600) {
 
                             LinearLayout.LayoutParams lp = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
@@ -472,14 +603,115 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void onGetProfileParsingRequestCompleted (String[] response){
+
+        // ошибку пока хз как ловить, лень разбираться
+
+//        if (responseBody != "") {
+        getProfileParsingRequestStatus = RequestStatus.COMPLETED;
+
+
+        System.out.println(response[0]); // fio
+        System.out.println(response[1]); // group
+
+
+        if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && getStudentMainDataRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
+            buildFrontendCalled = true;
+            buildFrontend();
+        }
+
+//        } else {
+//            getExercisesByDayRequestStatus = RequestStatus.EMPTY_RESPONSE;
+//            System.out.println("GetExercisesByDay Failure!");
+//        }
+    }
+
+    public void onGetScheduleParsingRequestCompleted(String param) {
+        if (getVKWallPostsRequestStatus == RequestStatus.COMPLETED && activeContainer == ContainerName.SCHEDULE) {
+
+            LinearLayout box = findViewById(R.id.scheduleList);
+            box.removeAllViews();
+            TextView text = new TextView(getApplicationContext());
+
+            JSONArray value = new JSONArray();
+
+            try {
+                value = scheduleLessons.getJSONArray(param);
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            for (int i = 0; i < value.length(); i++) {
+
+                switch (i) {
+                    case 0: {
+                        text.setText(text.getText() + "Понедельник:\n\n");
+                        break;
+                    }
+                    case 1: {
+                        text.setText(text.getText() + "Вторник:\n\n");
+                        break;
+                    }
+                    case 2: {
+                        text.setText(text.getText() + "Среда:\n\n");
+                        break;
+                    }
+                    case 3: {
+                        text.setText(text.getText() + "Четверг:\n\n");
+                        break;
+                    }
+                    case 4: {
+                        text.setText(text.getText() + "Пятница:\n\n");
+                        break;
+                    }
+                    case 5: {
+                        text.setText(text.getText() + "Суббота:\n\n");
+                        break;
+                    }
+                }
+
+                JSONArray temp = new JSONArray();
+                try {
+                    temp = value.getJSONArray(i);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                for (int j = 0; j < temp.length(); j++) {
+
+                    JSONObject tmp = new JSONObject();
+                    try {
+                        tmp = temp.getJSONObject(j);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                    try {
+                        text.setText(text.getText() + tmp.getString("position") + " (" + tmp.getString("start") + tmp.getString("end") + ") " + tmp.getString("name") + " (" + tmp.getString("teacher") + ")\n");
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    text.setText(text.getText() + "\n\n");
+
+                }
+            }
+
+            box.addView(text);
+
+        } else {
+            getScheduleParsingRequestStatus = RequestStatus.EMPTY_RESPONSE;
+            System.out.println("GetScheduleParsing Failure!");
+        }
+    }
+
 
     // Сами асинхронные запросы
 
     // [name, password]
-    class loginRequest extends AsyncTask<String[], Void, String> {
+    class loginRequest extends AsyncTask<String[], Void, String[]> {
 
         @Override
-        protected String doInBackground(String[]... params) { // params[0][0] - name, params[0][1] - password
+        protected String[] doInBackground(String[]... params) { // params[0][0] - name, params[0][1] - password
             URL url;
             HttpURLConnection urlConnection = null;
             String authCookie = "";
@@ -525,11 +757,11 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            return authCookie;
+            return new String[] {authCookie, params[0][0], params[0][1] };
         }
 
         @Override
-        protected void onPostExecute(String result) {
+        protected void onPostExecute(String[] result) {
             super.onPostExecute(result);
             onLoginRequestCompleted(result);
         }
@@ -539,7 +771,6 @@ public class MainActivity extends AppCompatActivity {
     class getStudentMainDataRequest extends AsyncTask<String[], Void, String> {
 
         protected String doInBackground(String[]... params) { // params[0][0] - year, params[0][1] - month
-            URL url;
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -549,37 +780,14 @@ public class MainActivity extends AppCompatActivity {
                         + "&dateyear=" + params[0][0]
                         + "&datemonth=" + params[0][1];
 
-                url = new URL(url_address);
-                urlConnection = (HttpURLConnection) url.openConnection();
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
-                urlConnection.setRequestMethod("GET");
-                urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
-                urlConnection.setRequestProperty("Cookie", authCookie);
-                urlConnection.setUseCaches(false);
-                urlConnection.setInstanceFollowRedirects(false);
-
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(urlConnection.getInputStream())
-                );
-
-                StringBuilder response = new StringBuilder();
-                String currentLine;
-
-                try {
-                    while ((currentLine = in.readLine()) != null) response.append(currentLine);
-                    in.close();
-                } catch (IOException e) {
-                    System.out.println(e.toString());
-                }
-
-                responseBody = response.toString();
             } catch (Exception e) {
                 System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
             } finally {
-                if (urlConnection != null) {
-                    urlConnection.disconnect();
-                }
+                if (urlConnection != null) urlConnection.disconnect();
             }
             return responseBody;
         }
@@ -593,7 +801,6 @@ public class MainActivity extends AppCompatActivity {
     // [lessonId]
     class getExercisesByLessonRequest extends AsyncTask <String[], Void, String[]> {
         protected String[] doInBackground(String[]... params) { // params[0][0] - lesson_id (String)
-            URL url;
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -601,37 +808,15 @@ public class MainActivity extends AppCompatActivity {
                 String url_address = "https://ifspo.ifmo.ru/journal/getStudentExercisesByLesson"
                         + "?lesson=" + params[0][0]
                         + "&student=" + studentId;
-                url = new URL(url_address);
-                urlConnection = (HttpURLConnection) url.openConnection();
 
-                urlConnection.setRequestMethod("GET");
-                urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
-                urlConnection.setRequestProperty("Cookie", authCookie);
-                urlConnection.setUseCaches(false);
-                urlConnection.setInstanceFollowRedirects(false);
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(urlConnection.getInputStream())
-                );
-
-                StringBuilder response = new StringBuilder();
-                String currentLine;
-
-                try {
-                    while ((currentLine = in.readLine()) != null) response.append(currentLine);
-                    in.close();
-                } catch (IOException e) {
-                    System.out.println(e.toString());
-                }
-
-                responseBody = response.toString();
             } catch (Exception e) {
-                System.out.println("Problems with getExercisesByLesson request");
+                System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
             } finally {
-                if (urlConnection != null) {
-                    urlConnection.disconnect();
-                }
+                if (urlConnection != null) urlConnection.disconnect();
             }
             return new String[] {responseBody, params[0][0]};
         }
@@ -642,10 +827,11 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+
     // [date <yyyy-mm-dd>]
     class getExercisesByDayRequest extends AsyncTask <String[], Void, String> {
+
         protected String doInBackground(String[]... params) { // params[0][0] - date <yyyy-mm-dd>
-            URL url;
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -654,37 +840,14 @@ public class MainActivity extends AppCompatActivity {
                         + "?student=" + studentId
                         + "&day=" + params[0][0];
 
-                url = new URL(url_address);
-                urlConnection = (HttpURLConnection) url.openConnection();
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
-                urlConnection.setRequestMethod("GET");
-                urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
-                urlConnection.setRequestProperty("Cookie", authCookie);
-                urlConnection.setUseCaches(false);
-                urlConnection.setInstanceFollowRedirects(false);
-
-                BufferedReader in = new BufferedReader(
-                        new InputStreamReader(urlConnection.getInputStream())
-                );
-
-                StringBuilder response = new StringBuilder();
-                String currentLine;
-
-                try {
-                    while ((currentLine = in.readLine()) != null) response.append(currentLine);
-                    in.close();
-                } catch (IOException e) {
-                    System.out.println(e.toString());
-                }
-
-                responseBody = response.toString();
             } catch (Exception e) {
-                System.out.println("Problems with getExercisesByDay request");
+                System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
             } finally {
-                if (urlConnection != null) {
-                    urlConnection.disconnect();
-                }
+                if (urlConnection != null) urlConnection.disconnect();
             }
             return responseBody;
         }
@@ -697,8 +860,8 @@ public class MainActivity extends AppCompatActivity {
 
     // [postsCount]
     class getVKWallPostsRequest extends AsyncTask <String[], Void, String> { // params[0][0] - posts count
+
         protected String doInBackground(String[]... params) {
-            URL url;
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -707,10 +870,84 @@ public class MainActivity extends AppCompatActivity {
                         + "&count=" + params[0][0]
                         + "&filter=owner&access_token=c2cb19e3c2cb19e3c2cb19e339c2a4f3d6cc2cbc2cb19e39c9fe125dc37c9d4bb7994cd&v=5.103";
 
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+
+            } catch (Exception e) {
+                System.out.println("Problems with getStudentMainData request");
+                System.out.println(e.toString());
+            } finally {
+                if (urlConnection != null) urlConnection.disconnect();
+            }
+            return responseBody;
+        }
+
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            onGetVKWallPostsRequestCompleted(result);
+        }
+    }
+
+
+    class getProfileParsingRequest extends AsyncTask<Void, Void, String[]> { //FIO, GROUP
+
+        protected String[] doInBackground(Void... params) {
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+            Document html = new Document(responseBody);
+
+            try {
+                String url_address = "https://ifspo.ifmo.ru/profile";
+
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection, 375000);
+//                System.out.println(responseBody);
+                html = Jsoup.parse(responseBody);
+            } catch (Exception e) {
+                System.out.println("Problems with getStudentMainData request");
+                System.out.println(e.toString());
+            } finally {
+                if (urlConnection != null) urlConnection.disconnect();
+            }
+
+            System.out.println("GetProfileParsing Success!");
+//            System.out.println(html.body().toString());
+            String FIO = html.body().getElementsByClass("row").get(0).getElementsByClass("span9").select("h3").get(0).text();
+            String GROUP = html.body().getElementsByClass("row").get(0).getElementsByClass("span9").get(0).getElementsByClass("row").get(0).getElementsByClass("span3").select("ul").select("li").last().text();
+            String[] groupContent = GROUP.split(" ");
+            groupNumber = Functions.getGroupIdByName(groupContent[0]);
+
+            System.out.println(groupNumber);
+//            JSONObject week = {"now": [{{"1", "10-11 30", "matan"}, {"2", "11 30 - 13 00", "matan"}}, { {} {} }]};
+
+            return new String[] {FIO, groupNumber};
+        }
+
+        protected void onPostExecute(String[] result) {
+            super.onPostExecute(result);
+            onGetProfileParsingRequestCompleted(result);
+
+        }
+    }
+
+
+    class getScheduleParsingRequest extends AsyncTask<String[], Void, String> { // Void на самом деле
+
+        protected String doInBackground(String[]... params) { // now next
+            URL url;
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+            Document html = new Document(responseBody);
+
+            try {
+                String url_address = "https://ifspo.ifmo.ru/schedule/get?num=" + groupNumber + "&week=" + params[0][0];
+
                 url = new URL(url_address);
                 urlConnection = (HttpURLConnection) url.openConnection();
 
                 urlConnection.setRequestMethod("GET");
+                urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
+                urlConnection.setRequestProperty("Cookie", authCookie);
                 urlConnection.setUseCaches(false);
                 urlConnection.setInstanceFollowRedirects(false);
 
@@ -729,23 +966,114 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 responseBody = response.toString();
+                html = Jsoup.parse(responseBody);
             } catch (Exception e) {
-                System.out.println("Problems with vk request");
+                System.out.println("Problems with sheduleParsing request");
                 System.out.println(e.toString());
             } finally {
                 if (urlConnection != null) {
                     urlConnection.disconnect();
                 }
             }
-            return responseBody;
+
+            System.out.println("GetScheduleParsing Success!");
+
+            JSONArray scheduleRoot = new JSONArray();
+
+            try {
+                scheduleLessons.put(params[0][0], new JSONArray());
+//                System.out.println(scheduleLessons.toString());
+                scheduleRoot = scheduleLessons.getJSONArray(params[0][0]);
+
+            } catch (JSONException e) {
+                e.printStackTrace();
+            }
+
+            for (int i = 0; i < 6; i++) {
+
+                scheduleRoot.put(new JSONArray());
+
+                JSONArray scheduleRootLesson = new JSONArray();
+                try {
+                    scheduleRootLesson = scheduleRoot.getJSONArray(i);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                Element root = html.body().getElementsByClass("schedule-row-table").get(0).getElementsByClass("weekday-div").get(i);
+                Elements lessonRoot = root.getElementsByClass("period-tr");
+                for (Element elem : lessonRoot) {
+
+                    scheduleRootLesson.put(new JSONObject());
+
+                    String numberOfLesson = elem.select("div").get(0).text();
+                    numberOfLesson = numberOfLesson.split(" ")[0];
+
+                    String timeOfLessonStart = "";
+                    String timeOfLessonEnd = "";
+
+                    switch (numberOfLesson) {
+                        case "I": {
+                            timeOfLessonStart = "8:20";
+                            timeOfLessonEnd = "9:50";
+                            break;
+                        }
+                        case "II": {
+                            timeOfLessonStart = "10:00";
+                            timeOfLessonEnd = "11:30";
+                            break;
+                        }
+                        case "III": {
+                            timeOfLessonStart = "11:40";
+                            timeOfLessonEnd = "13:10";
+                            break;
+                        }
+                        case "IV": {
+                            timeOfLessonStart = "13:30";
+                            timeOfLessonEnd = "15:00";
+                            break;
+                        }
+                        case "V": {
+                            timeOfLessonStart = "15:20";
+                            timeOfLessonEnd = "16:50";
+                            break;
+                        }
+                        case "VI": {
+                            timeOfLessonStart = "17:00";
+                            timeOfLessonEnd = "18:30";
+                            break;
+                        }
+                    }
+                    String nameOfLesson = elem.getElementsByClass("lesson_td").get(0).select("div").get(0).text();
+                    String teacherOfLesson = elem.getElementsByClass("lesson_td").get(0).select("div").get(1).text();
+
+                    JSONObject scheduleRootLessonInformation = new JSONObject();
+                    try {
+                        scheduleRootLessonInformation = scheduleRootLesson.getJSONObject(scheduleRootLesson.length() - 1);
+                        scheduleRootLessonInformation.put("position", numberOfLesson);
+                        scheduleRootLessonInformation.put("start", timeOfLessonStart);
+                        scheduleRootLessonInformation.put("end", timeOfLessonEnd);
+                        scheduleRootLessonInformation.put("name", nameOfLesson);
+                        scheduleRootLessonInformation.put("teacher", teacherOfLesson);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                }
+
+            }
+
+            System.out.println(scheduleLessons.toString());
+
+            return params[0][0];
         }
 
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-            onGetVKWallPostsRequestCompleted(result);
+            getVKWallPostsRequestStatus = RequestStatus.COMPLETED;
+            onGetScheduleParsingRequestCompleted(result);
         }
     }
-
 
 
 
@@ -777,6 +1105,9 @@ public class MainActivity extends AppCompatActivity {
     Button exit;
 
     Button userHelp;
+    Button scheduleChanges;
+    Button scheduleNow;
+    Button scheduleNext;
 
     // переменная для мониторинга активного контейнера
 
@@ -795,6 +1126,25 @@ public class MainActivity extends AppCompatActivity {
         В общем, все нормально, кроме вывода информации по парам для каждого предмета
         Потому что использу.тся переменные exercises, exercisesVisits (с getStudentMainDataRequest) кторые показывают пары только за текущий месяц.
     */
+
+
+
+    //            JSONObject schedule = {
+
+//              "now": [ // week
+
+//                  [ // day
+//                      {position: "I", start: "10", end: "11", name: "name", teacher: "teacher"}, // lesson
+//                      {position: "II", start: "11", end: "12", name: "name", teacher: "teacher"}
+//                  ],
+//                  [ // day
+//                      {position: "I", start: "10", end: "11", name: "name", teacher: "teacher"}, // lesson
+//                      {position: "II", start: "11", end: "12", name: "name", teacher: "teacher"}
+//                  ]
+//
+//              ]
+
+//            };
 
 
     void buildFrontend() {
@@ -868,6 +1218,8 @@ public class MainActivity extends AppCompatActivity {
         lessons.setOnClickListener(wasClicked);
         exit.setOnClickListener(wasClicked);
 
+        scheduleChanges.setOnClickListener(wasClicked);
+
 
         final LinearLayout todayLessonsView = (LinearLayout) findViewById(R.id.todayLessonsView);
 
@@ -940,30 +1292,22 @@ public class MainActivity extends AppCompatActivity {
 
             switch (activeContainer) {
                 case PROFILE: {
-                    if (v.getId() == profile.getId()) {
-                        return;
-                    }
+                    if (v.getId() == profile.getId()) return;
                     main.removeView(profileScreen);
                     break;
                 }
                 case HOME: {
-                    if (v.getId() == home.getId()) {
-                        return;
-                    }
+                    if (v.getId() == home.getId()) return;
                     main.removeView(homeScreen);
                     break;
                 }
                 case SCHEDULE: {
-                    if (v.getId() == schedule.getId()) {
-                        return;
-                    }
+                    if (v.getId() == schedule.getId()) return;
                     main.removeView(scheduleScreen);
                     break;
                 }
                 case LESSONS: {
-                    if (v.getId() == lessons.getId()) {
-                        return;
-                    }
+                    if (v.getId() == lessons.getId()) return;
                     main.removeView(lessonsScreen);
                     break;
                 }
@@ -971,11 +1315,8 @@ public class MainActivity extends AppCompatActivity {
                     main.removeView(lessonsInformationScreen);
                     break;
                 }
-
                 case NOTIFICATION: {
-                    if (v.getId() == userHelp.getId()) {
-                        return;
-                    }
+                    if (v.getId() == userHelp.getId()) return;
                     main.removeView(notificationListScreen);
                     break;
                 }
@@ -1007,7 +1348,7 @@ public class MainActivity extends AppCompatActivity {
                 main.addView(lessonsScreen);
             }
 
-            if (v.getId() == userHelp.getId()) {
+            if (v.getId() == userHelp.getId() || v.getId() == scheduleChanges.getId()) {
                 System.out.println("You clicked notifications");
                 activeContainer = ContainerName.NOTIFICATION;
                 main.addView(notificationListScreen);
@@ -1129,7 +1470,5 @@ public class MainActivity extends AppCompatActivity {
         }
 
     }
-
-
 
 }
