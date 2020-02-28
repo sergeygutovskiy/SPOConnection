@@ -220,11 +220,13 @@ public class MainActivity extends AppCompatActivity {
         appFirstRun = preferences.getBoolean("appFirstRun", true);
         // первый запуск
         if (appFirstRun) {
+            System.out.println("App first run");
             preferencesEditor = preferences.edit();
 
             preferencesEditor.putBoolean("appFirstRun", false);
             preferencesEditor.apply();
         } else {
+            System.out.println("Not app first run");
             String lastLoginRequestTime = preferences.getString("lastLoginRequest", "");
 
             // есть дата последнего входа в аккаунт
@@ -236,26 +238,35 @@ public class MainActivity extends AppCompatActivity {
                 catch (ParseException e) {}
                 currentDate = new Date();
 
+                long minutesBetweenDates = ((currentDate.getTime() / 60000) - (loginRequestDate.getTime() / 60000));
+                System.out.println("Last login request was " + minutesBetweenDates + " minutes ago");
+
                 // вход был выполнен более 100 минут назад, тогда нужно сделать запрос заново
-                if ( ((currentDate.getTime() * 1000 * 60) - (loginRequestDate.getTime() * 1000 * 60) >= 100)) {
+                if ( minutesBetweenDates >= 100) {
+                    System.out.println("Cookie lifetime is more then 100 minutes. Sending new login request");
+
                     String name = preferences.getString("studentName", "");
                     String password = preferences.getString("studentPassword", "");
 
                     sendLoginRequest(new String[] { name, password });
                 // иначе пропускаем вход в аккаунт
                 } else {
+                    System.out.println("Cookie lifetime is less then 100 minutes. Continue");
                     authCookie = preferences.getString("authCookie", "");
+//                    groupNumber = preferences.getString("studentFIO", "");
+                    groupNumber = preferences.getString("studentGroup", "");
 
-                    // загружаем предметы, учителей и пары за сегодня
+                    String[] decoded_cookie = URLDecoder.decode(authCookie).split("s:");
+                    String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
+                    studentId = userIdDirty.substring(1, userIdDirty.length() - 2);
 
-                    String year = new SimpleDateFormat("yyyy").format(currentDate);
-                    String month = new SimpleDateFormat("MM").format(currentDate);
-                    String day = new SimpleDateFormat("dd").format(currentDate);
+                    String year = new SimpleDateFormat("yyyy").format(new Date());
+                    String month = new SimpleDateFormat("MM").format(new Date());
+                    String day = new SimpleDateFormat("dd").format(new Date());
 
+                    getProfileParsingRequestStatus = RequestStatus.COMPLETED;
                     sendGetStudentMainDataRequest(new String[]{ year, month });
                     sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
-                    sendGetProfileParsingRequest();
-
                 }
 
             }
@@ -341,6 +352,10 @@ public class MainActivity extends AppCompatActivity {
 
             authCookie = cookie;
 
+            String[] decoded_cookie = URLDecoder.decode(authCookie).split("s:");
+            String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
+            studentId = userIdDirty.substring(1, userIdDirty.length() - 2);
+
             System.out.println("Login success!");
             System.out.println("AuthCookie: " + authCookie);
 
@@ -412,10 +427,16 @@ public class MainActivity extends AppCompatActivity {
             JSONObject jsonData;
             try {
                 jsonData = new JSONObject(responseBody);
+                System.out.println(jsonData.toString());
 
                 exercisesByDay = jsonData.getJSONArray("todayExercises");
-                exercisesVisitsByDay = jsonData.getJSONObject("todayExercisesVisits");
 
+                System.out.println(jsonData.get("todayExercisesVisits"));
+
+                if (!jsonData.get("todayExercisesVisits").equals(null))
+                    exercisesVisitsByDay = jsonData.getJSONObject("todayExercisesVisits");
+                else
+                    exercisesVisitsByDay = new JSONObject();
                 System.out.println("TodayExercises: " + exercisesByDay.toString());
                 System.out.println("TodayExercisesVisits: " + exercisesVisitsByDay.toString());
 
@@ -425,7 +446,7 @@ public class MainActivity extends AppCompatActivity {
                 }
 
             } catch (JSONException e) {
-
+                System.out.println(e.toString());
             }
         } else {
             getExercisesByDayRequestStatus = RequestStatus.EMPTY_RESPONSE;
@@ -610,6 +631,13 @@ public class MainActivity extends AppCompatActivity {
 //        if (responseBody != "") {
         getProfileParsingRequestStatus = RequestStatus.COMPLETED;
 
+        preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+        preferencesEditor = preferences.edit();
+
+        preferencesEditor.putString("studentFIO", response[0]);
+        preferencesEditor.putString("studentGroup", response[1]);
+        preferencesEditor.apply();
+
 
         System.out.println(response[0]); // fio
         System.out.println(response[1]); // group
@@ -743,10 +771,6 @@ public class MainActivity extends AppCompatActivity {
 
                 if (cookies_count > 1) {
                     authCookie = cookies.get(cookies_count - 1);
-
-                    String[] decoded_cookie = URLDecoder.decode(authCookie).split("s:");
-                    String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
-                    studentId = userIdDirty.substring(1, userIdDirty.length() - 2);
                 }
             } catch (Exception e) {
                 System.out.println("Problems with login request");
