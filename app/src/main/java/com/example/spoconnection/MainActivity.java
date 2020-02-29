@@ -56,6 +56,8 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
+    final long COOKIE_LIFETIME = 100; // в минутах. На самом деле 120 минут.
+
     // Переменные, получаемые с запросов
 
     // by loginRequest
@@ -142,7 +144,9 @@ public class MainActivity extends AppCompatActivity {
     JSONObject scheduleLessons = new JSONObject();
 
     // номер группы пользователя
-    String groupNumber;
+    String studentGroup;
+    String studentFIO;
+    String studentAvatarSrc;
 
     SharedPreferences preferences;
     SharedPreferences.Editor preferencesEditor;
@@ -234,37 +238,46 @@ public class MainActivity extends AppCompatActivity {
                 Date loginRequestDate = null;
                 Date currentDate;
 
-                try { loginRequestDate = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss").parse(lastLoginRequestTime); }
+                try { loginRequestDate = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").parse(lastLoginRequestTime); }
                 catch (ParseException e) {}
                 currentDate = new Date();
+                System.out.println(new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").format(currentDate));
 
                 long minutesBetweenDates = ((currentDate.getTime() / 60000) - (loginRequestDate.getTime() / 60000));
+                System.out.println(currentDate);
+                System.out.println(loginRequestDate);
+                System.out.println(lastLoginRequestTime);
                 System.out.println("Last login request was " + minutesBetweenDates + " minutes ago");
 
-                // вход был выполнен более 100 минут назад, тогда нужно сделать запрос заново
-                if ( minutesBetweenDates >= 100) {
-                    System.out.println("Cookie lifetime is more then 100 minutes. Sending new login request");
+                // вход был выполнен более COOKIE_LIFETIME минут назад, тогда нужно сделать запрос заново
+                if ( minutesBetweenDates >= COOKIE_LIFETIME) {
+                    System.out.println("Cookie lifetime is more then" + COOKIE_LIFETIME + " minutes. Sending new login request");
 
                     String name = preferences.getString("studentName", "");
                     String password = preferences.getString("studentPassword", "");
 
+                    studentGroup = preferences.getString("studentGroup", "");
+                    studentFIO = preferences.getString("studentFIO", "");
+                    studentAvatarSrc = preferences.getString("studentAvatarSrc", "");
+                    getProfileParsingRequestStatus = RequestStatus.COMPLETED;
+
                     sendLoginRequest(new String[] { name, password });
                 // иначе пропускаем вход в аккаунт
                 } else {
-                    System.out.println("Cookie lifetime is less then 100 minutes. Continue");
+                    System.out.println("Cookie lifetime is less then" + COOKIE_LIFETIME + " minutes. Continue");
                     authCookie = preferences.getString("authCookie", "");
-//                    groupNumber = preferences.getString("studentFIO", "");
-                    groupNumber = preferences.getString("studentGroup", "");
+                    studentId = Functions.getStudentIdFromCookie(authCookie);
 
-                    String[] decoded_cookie = URLDecoder.decode(authCookie).split("s:");
-                    String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
-                    studentId = userIdDirty.substring(1, userIdDirty.length() - 2);
-
-                    String year = new SimpleDateFormat("yyyy").format(new Date());
-                    String month = new SimpleDateFormat("MM").format(new Date());
-                    String day = new SimpleDateFormat("dd").format(new Date());
-
+                    studentGroup = preferences.getString("studentGroup", "");
+                    studentFIO = preferences.getString("studentFIO", "");
+                    studentAvatarSrc = preferences.getString("studentAvatarSrc", "");
                     getProfileParsingRequestStatus = RequestStatus.COMPLETED;
+
+                    Date date = new Date();
+                    String year = new SimpleDateFormat("yyyy").format(date);
+                    String month = new SimpleDateFormat("MM").format(date);
+                    String day = new SimpleDateFormat("dd").format(date);
+
                     sendGetStudentMainDataRequest(new String[]{ year, month });
                     sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
                 }
@@ -342,19 +355,16 @@ public class MainActivity extends AppCompatActivity {
 
     // Колбеки, которые вызываются при завершении определенного запроса
 
-    public void onLoginRequestCompleted(String[] params) {
-        String cookie = params[0];
-        String studentName = params[1];
-        String studentPassword = params[2];
+    public void onLoginRequestCompleted(String[] response) {
+        String cookie = response[0];
+        String studentName = response[1];
+        String studentPassword = response[2];
 
-        if (cookie != "") {
+        if (!cookie.isEmpty()) {
             loginRequestStatus = RequestStatus.COMPLETED;
 
             authCookie = cookie;
-
-            String[] decoded_cookie = URLDecoder.decode(authCookie).split("s:");
-            String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
-            studentId = userIdDirty.substring(1, userIdDirty.length() - 2);
+            studentId = Functions.getStudentIdFromCookie(authCookie);
 
             System.out.println("Login success!");
             System.out.println("AuthCookie: " + authCookie);
@@ -362,7 +372,7 @@ public class MainActivity extends AppCompatActivity {
             preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
             preferencesEditor = preferences.edit();
 
-            String currentDate = new SimpleDateFormat("dd-MM-yyyy hh:mm:ss").format(new Date());
+            String currentDate = new SimpleDateFormat("dd-MM-yyyy HH:mm:ss").format(new Date());
             preferencesEditor.putString("lastLoginRequest", currentDate);
             preferencesEditor.putString("authCookie", authCookie);
             preferencesEditor.putString("studentName", studentName);
@@ -378,7 +388,7 @@ public class MainActivity extends AppCompatActivity {
 
             sendGetStudentMainDataRequest(new String[]{ year, month });
             sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
-            sendGetProfileParsingRequest();
+            if (getProfileParsingRequestStatus != RequestStatus.COMPLETED) sendGetProfileParsingRequest();
 
         } else {
             loginRequestStatus = RequestStatus.EMPTY_RESPONSE;
@@ -626,32 +636,35 @@ public class MainActivity extends AppCompatActivity {
 
     public void onGetProfileParsingRequestCompleted (String[] response){
 
-        // ошибку пока хз как ловить, лень разбираться
+        String studentFIO = response[0];
+        String studentGroup = response[1];
 
-//        if (responseBody != "") {
-        getProfileParsingRequestStatus = RequestStatus.COMPLETED;
+        if ( !(studentFIO.isEmpty() || studentGroup.isEmpty()) ) {
+            getProfileParsingRequestStatus = RequestStatus.COMPLETED;
 
-        preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
-        preferencesEditor = preferences.edit();
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
 
-        preferencesEditor.putString("studentFIO", response[0]);
-        preferencesEditor.putString("studentGroup", response[1]);
-        preferencesEditor.apply();
+            preferencesEditor.putString("studentFIO", studentFIO);
+            preferencesEditor.putString("studentGroup", studentGroup);
+            preferencesEditor.putString("studentAvatarSrc", studentAvatarSrc);
+            preferencesEditor.apply();
+
+            this.studentFIO = studentFIO;
+            this.studentGroup = studentGroup;
+
+//            System.out.println(response[0]); // fio
+//            System.out.println(response[1]); // group
 
 
-        System.out.println(response[0]); // fio
-        System.out.println(response[1]); // group
-
-
-        if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && getStudentMainDataRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
-            buildFrontendCalled = true;
-            buildFrontend();
+            if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && getStudentMainDataRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
+                buildFrontendCalled = true;
+                buildFrontend();
+            }
+        } else {
+            getExercisesByDayRequestStatus = RequestStatus.EMPTY_RESPONSE;
+            System.out.println("ProfileParsing Failure!");
         }
-
-//        } else {
-//            getExercisesByDayRequestStatus = RequestStatus.EMPTY_RESPONSE;
-//            System.out.println("GetExercisesByDay Failure!");
-//        }
     }
 
     public void onGetScheduleParsingRequestCompleted(String param) {
@@ -742,7 +755,7 @@ public class MainActivity extends AppCompatActivity {
         protected String[] doInBackground(String[]... params) { // params[0][0] - name, params[0][1] - password
             URL url;
             HttpURLConnection urlConnection = null;
-            String authCookie = "";
+            String cookie = "";
 
             try {
                 String url_address = "https://ifspo.ifmo.ru/";
@@ -770,7 +783,7 @@ public class MainActivity extends AppCompatActivity {
                 Integer cookies_count = cookies.size();
 
                 if (cookies_count > 1) {
-                    authCookie = cookies.get(cookies_count - 1);
+                    cookie = cookies.get(cookies_count - 1);
                 }
             } catch (Exception e) {
                 System.out.println("Problems with login request");
@@ -781,7 +794,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            return new String[] {authCookie, params[0][0], params[0][1] };
+            return new String[] { cookie, params[0][0], params[0][1] };
         }
 
         @Override
@@ -850,7 +863,6 @@ public class MainActivity extends AppCompatActivity {
             onGetExercisesByLessonRequestCompleted(result);
         }
     }
-
 
     // [date <yyyy-mm-dd>]
     class getExercisesByDayRequest extends AsyncTask <String[], Void, String> {
@@ -924,27 +936,97 @@ public class MainActivity extends AppCompatActivity {
                 String url_address = "https://ifspo.ifmo.ru/profile";
 
                 urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
-                responseBody = Functions.getResponseFromGetRequest(urlConnection, 375000);
-//                System.out.println(responseBody);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+
                 html = Jsoup.parse(responseBody);
+
             } catch (Exception e) {
-                System.out.println("Problems with getStudentMainData request");
+                System.out.println("Problems with GetProfileParsing request");
                 System.out.println(e.toString());
             } finally {
                 if (urlConnection != null) urlConnection.disconnect();
             }
 
             System.out.println("GetProfileParsing Success!");
-//            System.out.println(html.body().toString());
-            String FIO = html.body().getElementsByClass("row").get(0).getElementsByClass("span9").select("h3").get(0).text();
-            String GROUP = html.body().getElementsByClass("row").get(0).getElementsByClass("span9").get(0).getElementsByClass("row").get(0).getElementsByClass("span3").select("ul").select("li").last().text();
-            String[] groupContent = GROUP.split(" ");
-            groupNumber = Functions.getGroupIdByName(groupContent[0]);
 
-            System.out.println(groupNumber);
+            String studentFIO = "";
+            String studentGroup = "";
+            String avatarSrc = "";
+            Element row;
+
+            Integer bodyRowsCount = html.body().getElementsByClass("row").size();
+            if (bodyRowsCount > 1) {
+                row = html.body().getElementsByClass("row").get(1);
+            } else {
+                row = html.body().getElementsByClass("row").get(0);
+            }
+
+            studentFIO = row.getElementsByClass("span9").select("h3").get(0).text();
+            studentGroup = row.getElementsByClass("span9").get(0)
+                    .getElementsByClass("row").get(0)
+                    .getElementsByClass("span3").select("ul").select("li").last().text();
+            avatarSrc = row.getElementsByClass("span3").get(0)
+                    .getElementsByClass("showchange").get(0)
+                    .getElementsByTag("img").get(0).attr("src");
+
+            studentAvatarSrc = avatarSrc;
+
+            String[] groupContent = studentGroup.split(" ");
+
+//            System.out.println(studentGroup);
 //            JSONObject week = {"now": [{{"1", "10-11 30", "matan"}, {"2", "11 30 - 13 00", "matan"}}, { {} {} }]};
 
-            return new String[] {FIO, groupNumber};
+//            try {
+//                String url_address = "https://ifspo.ifmo.ru" + avatarSrc;
+//
+//                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+//                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+//
+//                System.out.println(responseBody);
+//
+//            } catch (Exception e) {
+//                System.out.println("Problems with ProfileParsing (Avatar) request");
+//                System.out.println(e.toString());
+//            } finally {
+//                if (urlConnection != null) urlConnection.disconnect();
+//            }
+
+            try {
+                String url_address = "https://ifspo.ifmo.ru/profile/getStudentStatistics";
+                URL url = new URL(url_address);
+                urlConnection = (HttpURLConnection) url.openConnection();
+
+                String urlParameters = "student_id=" + studentId;
+                byte[] postData = urlParameters.getBytes(Charset.forName("UTF-8"));
+                int postDataLength = postData.length;
+
+                urlConnection.setRequestMethod("POST");
+                urlConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
+                urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
+                urlConnection.setRequestProperty("Content-Length", Integer.toString(postDataLength));
+                urlConnection.setRequestProperty("Accept", "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,image/apng,*/*;q=0.8,application/signed-exchange;v=b3;q=0.9");
+                urlConnection.setRequestProperty("Cookie", authCookie);
+                urlConnection.setDoOutput(true);
+                urlConnection.setUseCaches(false);
+                urlConnection.setInstanceFollowRedirects(false);
+
+                try (DataOutputStream wr = new DataOutputStream(urlConnection.getOutputStream())) {
+                    wr.write(postData);
+                }
+
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+                System.out.println(responseBody);
+
+            } catch (Exception e) {
+                System.out.println("Problems with statistics request");
+                System.out.println(e.toString());
+            } finally {
+                if (urlConnection != null) {
+                    urlConnection.disconnect();
+                }
+            }
+
+            return new String[] {studentFIO, Functions.getGroupIdByName(groupContent[0]) };
         }
 
         protected void onPostExecute(String[] result) {
@@ -964,7 +1046,7 @@ public class MainActivity extends AppCompatActivity {
             Document html = new Document(responseBody);
 
             try {
-                String url_address = "https://ifspo.ifmo.ru/schedule/get?num=" + groupNumber + "&week=" + params[0][0];
+                String url_address = "https://ifspo.ifmo.ru/schedule/get?num=" + studentGroup + "&week=" + params[0][0];
 
                 url = new URL(url_address);
                 urlConnection = (HttpURLConnection) url.openConnection();

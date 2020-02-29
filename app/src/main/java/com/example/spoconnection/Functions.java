@@ -7,6 +7,7 @@ import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
 import java.net.ProtocolException;
 import java.net.URL;
+import java.net.URLDecoder;
 
 public class Functions {
 
@@ -57,22 +58,29 @@ public class Functions {
         return response.toString();
     }
 
-    public static String getResponseFromGetRequest(HttpURLConnection con, Integer responseLength) throws IOException{
-        StringBuilder response = new StringBuilder();
-        String currentLine;
-
-        BufferedReader in = new BufferedReader(
-                new InputStreamReader(con.getInputStream())
-        );
-//        int i = 0;
-        while (((currentLine = in.readLine()) != null) && responseLength > 0) {
-            response.append(currentLine);
-            responseLength -= currentLine.length();
-//            i += currentLine.length();
-        }
-//        System.out.println(i);
-        in.close();
-
-        return response.toString();
+    public static String getStudentIdFromCookie(String cookie) {
+        String[] decoded_cookie = URLDecoder.decode(cookie).split("s:");
+        String userIdDirty = decoded_cookie[decoded_cookie.length - 5].split(":")[1];
+        return userIdDirty.substring(1, userIdDirty.length() - 2);
     }
+
+//
+//    public static String getResponseFromGetRequest(HttpURLConnection con, Integer responseLength) throws IOException{
+//        StringBuilder response = new StringBuilder();
+//        String currentLine;
+//
+//        BufferedReader in = new BufferedReader(
+//                new InputStreamReader(con.getInputStream())
+//        );
+////        int i = 0;
+//        while (((currentLine = in.readLine()) != null) && responseLength > 0) {
+//            response.append(currentLine);
+//            responseLength -= currentLine.length();
+////            i += currentLine.length();
+//        }
+////        System.out.println(i);
+//        in.close();
+//
+//        return response.toString();
+//    }
 }
