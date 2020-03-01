@@ -5,12 +5,16 @@ import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.Context;
 import android.content.SharedPreferences;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
+import android.graphics.drawable.BitmapDrawable;
 import android.os.Bundle;
 import android.os.AsyncTask;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.ImageView;
 import android.widget.LinearLayout;
 import android.widget.RelativeLayout;
 import android.widget.TextView;
@@ -26,10 +30,13 @@ import org.jsoup.nodes.Element;
 import org.jsoup.select.Elements;
 
 import java.io.BufferedReader;
+import java.io.ByteArrayOutputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
+import java.net.MalformedURLException;
 import java.net.URL;
 import java.net.URLDecoder;
 
@@ -138,15 +145,19 @@ public class MainActivity extends AppCompatActivity {
     public RelativeLayout lessonsInformationScreen;
     public LinearLayout userHelpScreen;
     public LinearLayout notificationListScreen;
+    public RelativeLayout loadingScreen;
 
 
     // массив расписания
     JSONObject scheduleLessons = new JSONObject();
 
-    // номер группы пользователя
-    String studentGroup;
+    String studentGroup; // 2234
     String studentFIO;
     String studentAvatarSrc;
+
+    String statsMidMark; // 4.74
+    String statsDebtsCount; // 0
+    String statsPercentageOfVisits; // 91%
 
     SharedPreferences preferences;
     SharedPreferences.Editor preferencesEditor;
@@ -173,6 +184,7 @@ public class MainActivity extends AppCompatActivity {
         lessonsInformationScreen = findViewById(R.id.lessonsInformationScreen);
         userHelpScreen = findViewById(R.id.userHelp);
         notificationListScreen = findViewById(R.id.notificationListScreen);
+        loadingScreen = findViewById(R.id.loadingScreen);
 
         // локальные кнопки экранов
 
@@ -217,6 +229,8 @@ public class MainActivity extends AppCompatActivity {
         main.removeView(lessonsInformationScreen);
         main.removeView(userHelpScreen);
         main.removeView(notificationListScreen);
+        main.removeView(loginForm);
+        activeContainer = ContainerName.LOADING;
 
 
         preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
@@ -224,6 +238,28 @@ public class MainActivity extends AppCompatActivity {
         appFirstRun = preferences.getBoolean("appFirstRun", true);
         // первый запуск
         if (appFirstRun) {
+
+            setContainer(ContainerName.LOGIN);
+
+            // получаем данные для отправки запроса
+
+            final TextInputEditText login = findViewById(R.id.loginFormLogin);
+            final TextInputEditText password = findViewById(R.id.loginFormPassword);
+            final Button submit = findViewById(R.id.loginFormSubmit);
+
+
+            submit.setOnClickListener(new View.OnClickListener() {
+
+                // отправляем запрос
+                @Override
+                public void onClick(View v) {
+                    sendLoginRequest(new String[] {
+                            login.getText().toString(),
+                            password.getText().toString()
+                    });
+                }
+            });
+
             System.out.println("App first run");
             preferencesEditor = preferences.edit();
 
@@ -251,6 +287,9 @@ public class MainActivity extends AppCompatActivity {
 
                 // вход был выполнен более COOKIE_LIFETIME минут назад, тогда нужно сделать запрос заново
                 if ( minutesBetweenDates >= COOKIE_LIFETIME) {
+
+                    setContainer(ContainerName.LOGIN);
+
                     System.out.println("Cookie lifetime is more then" + COOKIE_LIFETIME + " minutes. Sending new login request");
 
                     String name = preferences.getString("studentName", "");
@@ -262,7 +301,7 @@ public class MainActivity extends AppCompatActivity {
                     getProfileParsingRequestStatus = RequestStatus.COMPLETED;
 
                     sendLoginRequest(new String[] { name, password });
-                // иначе пропускаем вход в аккаунт
+                    // иначе пропускаем вход в аккаунт
                 } else {
                     System.out.println("Cookie lifetime is less then" + COOKIE_LIFETIME + " minutes. Continue");
                     authCookie = preferences.getString("authCookie", "");
@@ -271,6 +310,11 @@ public class MainActivity extends AppCompatActivity {
                     studentGroup = preferences.getString("studentGroup", "");
                     studentFIO = preferences.getString("studentFIO", "");
                     studentAvatarSrc = preferences.getString("studentAvatarSrc", "");
+
+                    statsMidMark = preferences.getString("studentStatsMidMark", "");
+                    statsDebtsCount = preferences.getString("studentStatsDebtsCount", "");
+                    statsPercentageOfVisits = preferences.getString("studentStatsPercentageOfVisits", "");
+
                     getProfileParsingRequestStatus = RequestStatus.COMPLETED;
 
                     Date date = new Date();
@@ -282,27 +326,30 @@ public class MainActivity extends AppCompatActivity {
                     sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
                 }
 
+            } else {
+                setContainer(ContainerName.LOGIN);
+
+                final TextInputEditText login = findViewById(R.id.loginFormLogin);
+                final TextInputEditText password = findViewById(R.id.loginFormPassword);
+                final Button submit = findViewById(R.id.loginFormSubmit);
+
+
+                submit.setOnClickListener(new View.OnClickListener() {
+
+                    // отправляем запрос
+                    @Override
+                    public void onClick(View v) {
+                        sendLoginRequest(new String[] {
+                                login.getText().toString(),
+                                password.getText().toString()
+                        });
+                    }
+                });
+
+                System.out.println("App first login");
             }
         }
 
-        // получаем данные для отправки запроса
-
-        final TextInputEditText login = findViewById(R.id.loginFormLogin);
-        final TextInputEditText password = findViewById(R.id.loginFormPassword);
-        final Button submit = findViewById(R.id.loginFormSubmit);
-
-
-        submit.setOnClickListener(new View.OnClickListener() {
-
-            // отправляем запрос
-            @Override
-            public void onClick(View v) {
-                sendLoginRequest(new String[] {
-                        login.getText().toString(),
-                        password.getText().toString()
-                });
-            }
-        });
 
     }
 
@@ -311,6 +358,7 @@ public class MainActivity extends AppCompatActivity {
     // Функции по отправке запроса. Их нужно вызывать при жедании сделать запрос
 
     private void sendLoginRequest(String[] params) {
+        setContainer(ContainerName.LOADING);
         loginRequest request = new loginRequest();
         loginRequestStatus = RequestStatus.CALLED;
         request.execute(params);
@@ -399,6 +447,9 @@ public class MainActivity extends AppCompatActivity {
     public void onGetStudentMainDataRequestCompleted(String responseBody) {
         if (responseBody != "") {
             getStudentMainDataRequestStatus = RequestStatus.COMPLETED;
+
+
+
 
             System.out.println("GetStudentMainData Success!");
             JSONObject jsonData;
@@ -614,7 +665,7 @@ public class MainActivity extends AppCompatActivity {
                             lp.setMargins(25, 25, 25, 50);
                             TextView note = new TextView(getApplicationContext());
                             note.setLayoutParams(lp);
-                            note.setText( (i+1) + " пост (" + new Date(Long.parseLong(tmp.getString("date"))*1000 + 3*3600*1000) + "):    " + tmp.getString("text"));
+                            note.setText( (i+1) + " пост (" + new Date(Long.parseLong(tmp.getString("date"))*1000) + "):    " + tmp.getString("text"));
                             LinearLayout notificationList = findViewById(R.id.notificationList);
                             notificationList.addView(note);
                         }
@@ -638,6 +689,11 @@ public class MainActivity extends AppCompatActivity {
 
         String studentFIO = response[0];
         String studentGroup = response[1];
+        String studentAvatarSrc = response[2];
+
+        String statsMidMark = response[3];
+        String statsDebtsCount = response[4];
+        String statsPercentageOfVisits = response[5];
 
         if ( !(studentFIO.isEmpty() || studentGroup.isEmpty()) ) {
             getProfileParsingRequestStatus = RequestStatus.COMPLETED;
@@ -648,13 +704,20 @@ public class MainActivity extends AppCompatActivity {
             preferencesEditor.putString("studentFIO", studentFIO);
             preferencesEditor.putString("studentGroup", studentGroup);
             preferencesEditor.putString("studentAvatarSrc", studentAvatarSrc);
+
+            preferencesEditor.putString("studentStatsMidMark", statsMidMark);
+            preferencesEditor.putString("studentStatsDebtsCount", statsDebtsCount);
+            preferencesEditor.putString("studentStatsPercentageOfVisits", statsPercentageOfVisits);
+
             preferencesEditor.apply();
 
             this.studentFIO = studentFIO;
             this.studentGroup = studentGroup;
+            this.studentAvatarSrc = studentAvatarSrc;
 
-//            System.out.println(response[0]); // fio
-//            System.out.println(response[1]); // group
+            this.statsMidMark = statsMidMark;
+            this.statsDebtsCount = statsDebtsCount;
+            this.statsPercentageOfVisits = statsPercentageOfVisits;
 
 
             if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && getStudentMainDataRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
@@ -668,7 +731,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetScheduleParsingRequestCompleted(String param) {
-        if (getVKWallPostsRequestStatus == RequestStatus.COMPLETED && activeContainer == ContainerName.SCHEDULE) {
+        if (getScheduleParsingRequestStatus == RequestStatus.COMPLETED && activeContainer == ContainerName.SCHEDULE) {
 
             LinearLayout box = findViewById(R.id.scheduleList);
             box.removeAllViews();
@@ -811,6 +874,18 @@ public class MainActivity extends AppCompatActivity {
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
+
+            // создаем мап для картинки
+
+            try {
+                bitmap = BitmapFactory.decodeStream((InputStream)new URL("https://ifspo.ifmo.ru" + studentAvatarSrc).getContent());
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
+
+
             try {
                 String url_address = "https://ifspo.ifmo.ru/profile/getStudentLessonsVisits"
                         + "?stud=" + studentId
@@ -924,6 +999,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    Bitmap bitmap; // картинка профиля
 
     class getProfileParsingRequest extends AsyncTask<Void, Void, String[]> { //FIO, GROUP
 
@@ -952,6 +1028,11 @@ public class MainActivity extends AppCompatActivity {
             String studentFIO = "";
             String studentGroup = "";
             String avatarSrc = "";
+
+            String statsMidMark = "";
+            String statsDebtsCount = "";
+            String statsPercentageOfVisits = "";
+
             Element row;
 
             Integer bodyRowsCount = html.body().getElementsByClass("row").size();
@@ -969,27 +1050,17 @@ public class MainActivity extends AppCompatActivity {
                     .getElementsByClass("showchange").get(0)
                     .getElementsByTag("img").get(0).attr("src");
 
-            studentAvatarSrc = avatarSrc;
+            studentGroup = studentGroup.split(" ")[0];
 
-            String[] groupContent = studentGroup.split(" ");
+            // создаем мап для картинки
 
-//            System.out.println(studentGroup);
-//            JSONObject week = {"now": [{{"1", "10-11 30", "matan"}, {"2", "11 30 - 13 00", "matan"}}, { {} {} }]};
-
-//            try {
-//                String url_address = "https://ifspo.ifmo.ru" + avatarSrc;
-//
-//                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
-//                responseBody = Functions.getResponseFromGetRequest(urlConnection);
-//
-//                System.out.println(responseBody);
-//
-//            } catch (Exception e) {
-//                System.out.println("Problems with ProfileParsing (Avatar) request");
-//                System.out.println(e.toString());
-//            } finally {
-//                if (urlConnection != null) urlConnection.disconnect();
-//            }
+            try {
+                bitmap = BitmapFactory.decodeStream((InputStream)new URL("https://ifspo.ifmo.ru" + avatarSrc).getContent());
+            } catch (MalformedURLException e) {
+                e.printStackTrace();
+            } catch (IOException e) {
+                e.printStackTrace();
+            }
 
             try {
                 String url_address = "https://ifspo.ifmo.ru/profile/getStudentStatistics";
@@ -1015,7 +1086,14 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
-                System.out.println(responseBody);
+                html = Jsoup.parse(responseBody);
+
+                Elements stats = html.body().getElementsByClass("stat-block");
+
+                statsMidMark = stats.get(0).getElementsByClass("stat-value").get(0).text();
+                statsDebtsCount = stats.get(1).getElementsByClass("stat-value").get(0).text();
+                statsPercentageOfVisits = stats.get(2).getElementsByClass("stat-value").get(0).text();
+                System.out.println(statsMidMark + " " + statsDebtsCount + " " + statsPercentageOfVisits);
 
             } catch (Exception e) {
                 System.out.println("Problems with statistics request");
@@ -1026,7 +1104,7 @@ public class MainActivity extends AppCompatActivity {
                 }
             }
 
-            return new String[] {studentFIO, Functions.getGroupIdByName(groupContent[0]) };
+            return new String[] { studentFIO, studentGroup, avatarSrc, statsMidMark, statsDebtsCount, statsPercentageOfVisits };
         }
 
         protected void onPostExecute(String[] result) {
@@ -1046,7 +1124,7 @@ public class MainActivity extends AppCompatActivity {
             Document html = new Document(responseBody);
 
             try {
-                String url_address = "https://ifspo.ifmo.ru/schedule/get?num=" + studentGroup + "&week=" + params[0][0];
+                String url_address = "https://ifspo.ifmo.ru/schedule/get?num=" + Functions.getGroupIdByName(studentGroup) + "&week=" + params[0][0];
 
                 url = new URL(url_address);
                 urlConnection = (HttpURLConnection) url.openConnection();
@@ -1176,7 +1254,7 @@ public class MainActivity extends AppCompatActivity {
 
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-            getVKWallPostsRequestStatus = RequestStatus.COMPLETED;
+            getScheduleParsingRequestStatus = RequestStatus.COMPLETED;
             onGetScheduleParsingRequestCompleted(result);
         }
     }
@@ -1217,8 +1295,88 @@ public class MainActivity extends AppCompatActivity {
 
     // переменная для мониторинга активного контейнера
 
-    enum ContainerName { PROFILE, HOME, SCHEDULE, LESSONS, LESSONS_INFORMATION, NOTIFICATION }
+    enum ContainerName { PROFILE, HOME, SCHEDULE, LESSONS, LESSONS_INFORMATION, NOTIFICATION, LOADING, LOGIN }
     ContainerName activeContainer;
+
+
+    public void setContainer(ContainerName newContainer) { // функция обновления активного контейнера
+        switch (activeContainer) {
+            case PROFILE: {
+                main.removeView(profileScreen);
+                break;
+            }
+            case HOME: {
+                main.removeView(homeScreen);
+                break;
+            }
+            case SCHEDULE: {
+                main.removeView(scheduleScreen);
+                break;
+            }
+            case LESSONS: {
+                main.removeView(lessonsScreen);
+                break;
+            }
+            case LESSONS_INFORMATION: {
+                main.removeView(lessonsInformationScreen);
+                break;
+            }
+            case NOTIFICATION: {
+                main.removeView(notificationListScreen);
+                break;
+            }
+            case LOGIN: {
+                main.removeView(loginForm);
+                break;
+            }
+            case LOADING: {
+                main.removeView(loadingScreen);
+            }
+        }
+
+        switch (newContainer) {
+            case PROFILE: {
+                main.addView(profileScreen);
+                activeContainer = ContainerName.PROFILE;
+                break;
+            }
+            case HOME: {
+                main.addView(homeScreen);
+                activeContainer = ContainerName.HOME;
+                break;
+            }
+            case SCHEDULE: {
+                main.addView(scheduleScreen);
+                activeContainer = ContainerName.SCHEDULE;
+                break;
+            }
+            case LESSONS: {
+                main.addView(lessonsScreen);
+                activeContainer = ContainerName.LESSONS;
+                break;
+            }
+            case LESSONS_INFORMATION: {
+                main.addView(lessonsInformationScreen);
+                activeContainer = ContainerName.LESSONS_INFORMATION;
+                break;
+            }
+            case NOTIFICATION: {
+                main.addView(notificationListScreen);
+                activeContainer = ContainerName.NOTIFICATION;
+                break;
+            }
+            case LOGIN: {
+                main.addView(loginForm);
+                activeContainer = ContainerName.LOGIN;
+                break;
+            }
+            case LOADING: {
+                main.addView(loadingScreen);
+                activeContainer = ContainerName.LOADING;
+            }
+        }
+    }
+
 
     /*
     Какие запросы, для каких сцен:
@@ -1260,6 +1418,8 @@ public class MainActivity extends AppCompatActivity {
 
         LinearLayout lessonsList = findViewById(R.id.lessonsList);
 
+        System.out.println(statsMidMark + " " + statsDebtsCount + " " + statsPercentageOfVisits);
+
         for(int i = 0; i < studentLessons.length(); i++){
             JSONObject value;
             try {
@@ -1292,15 +1452,18 @@ public class MainActivity extends AppCompatActivity {
         main.removeView(lessonsScreen);
 
         // убираем регистрацию и подрубаем стартовый экран
-
+        main.removeView(loadingScreen);
         main.removeView(loginForm);
-        main.addView(profileScreen);
+        setContainer(ContainerName.PROFILE);
         main.addView(navigation);
         main.addView(userHelpScreen);
 
-        // делаем активным контейнер profile
+        // инициализируем картинку
 
-        activeContainer = ContainerName.PROFILE;
+        ImageView img = (ImageView) findViewById(R.id.profileImage);
+        img.setImageBitmap(bitmap);
+        img.setScaleType(ImageView.ScaleType.FIT_XY);
+
 
         // создаем слушатели для кнопок
 
@@ -1326,6 +1489,13 @@ public class MainActivity extends AppCompatActivity {
 
         scheduleChanges.setOnClickListener(wasClicked);
 
+        // под удаление - вывод инфы о юзере
+
+        TextView text = new TextView(this);
+        LinearLayout.LayoutParams lpText = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+        lpText.setMargins(50,50,50,50);
+        text.setText(studentFIO + " - " + studentGroup);
+        profileScreen.addView(text);
 
         final LinearLayout todayLessonsView = (LinearLayout) findViewById(R.id.todayLessonsView);
 
@@ -1432,32 +1602,27 @@ public class MainActivity extends AppCompatActivity {
 
             if (v.getId() == home.getId()) {
                 System.out.println("You clicked home");
-                activeContainer = ContainerName.HOME;
-                main.addView(homeScreen);
+                setContainer(ContainerName.HOME);
             }
 
             if (v.getId() == schedule.getId()) {
                 System.out.println("You clicked schedule");
-                activeContainer = ContainerName.SCHEDULE;
-                main.addView(scheduleScreen);
+                setContainer(ContainerName.SCHEDULE);
             }
 
             if (v.getId() == profile.getId()) {
                 System.out.println("You clicked profile");
-                activeContainer = ContainerName.PROFILE;
-                main.addView(profileScreen);
+                setContainer(ContainerName.PROFILE);
             }
 
             if (v.getId() == lessons.getId()) {
                 System.out.println("You clicked lessons");
-                activeContainer = ContainerName.LESSONS;
-                main.addView(lessonsScreen);
+                setContainer(ContainerName.LESSONS);
             }
 
             if (v.getId() == userHelp.getId() || v.getId() == scheduleChanges.getId()) {
                 System.out.println("You clicked notifications");
-                activeContainer = ContainerName.NOTIFICATION;
-                main.addView(notificationListScreen);
+                setContainer(ContainerName.NOTIFICATION);
             }
 
             if (v.getId() == exit.getId()) {
