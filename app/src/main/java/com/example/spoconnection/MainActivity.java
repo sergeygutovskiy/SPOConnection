@@ -92,15 +92,14 @@ public class MainActivity extends AppCompatActivity {
     */
     enum RequestStatus {NOT_CALLED, CALLED, COMPLETED, FAILED, EMPTY_RESPONSE}
 
-
-    RequestStatus loginRequestStatus                    = RequestStatus.NOT_CALLED;
-    RequestStatus getStudentMainDataRequestStatus       = RequestStatus.NOT_CALLED;
-    RequestStatus getExercisesByDayRequestStatus        = RequestStatus.NOT_CALLED;
-    RequestStatus getExercisesByLessonRequestStatus     = RequestStatus.NOT_CALLED;
-    RequestStatus getVKWallPostsRequestStatus           = RequestStatus.NOT_CALLED;
-    RequestStatus getStudentProfileDataRequestStatus    = RequestStatus.NOT_CALLED;
-    RequestStatus getScheduleRequestStatus              = RequestStatus.NOT_CALLED;
-    RequestStatus getStudentStatsRequestStatus          = RequestStatus.NOT_CALLED;
+    RequestStatus loginRequestStatus;
+    RequestStatus getStudentMainDataRequestStatus;
+    RequestStatus getExercisesByDayRequestStatus;
+    RequestStatus getExercisesByLessonRequestStatus;
+    RequestStatus getVKWallPostsRequestStatus;
+    RequestStatus getStudentProfileDataRequestStatus;
+    RequestStatus getScheduleRequestStatus;
+    RequestStatus getStudentStatsRequestStatus;
 
 
     // Переменная, чтобы buildFrontend не вызвался дважды (и после getMainData и после getByDay)
@@ -150,6 +149,8 @@ public class MainActivity extends AppCompatActivity {
         // убрать шторку сверху
         Window w = getWindow();
         w.setFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN, WindowManager.LayoutParams.FLAG_FULLSCREEN);
+
+        getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
 
         // инициализируем экраны
 
@@ -213,7 +214,7 @@ public class MainActivity extends AppCompatActivity {
         main.removeView(loginForm);
         activeContainer = ContainerName.LOADING;
 
-
+        resetRequestsStatuses();
 
         preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
 
@@ -334,6 +335,17 @@ public class MainActivity extends AppCompatActivity {
     }
 
     /* -------------------------------------------- BackEnd -------------------------------------------- */
+
+    public void resetRequestsStatuses() {
+        loginRequestStatus                    = RequestStatus.NOT_CALLED;
+        getStudentMainDataRequestStatus       = RequestStatus.NOT_CALLED;
+        getExercisesByDayRequestStatus        = RequestStatus.NOT_CALLED;
+        getExercisesByLessonRequestStatus     = RequestStatus.NOT_CALLED;
+        getVKWallPostsRequestStatus           = RequestStatus.NOT_CALLED;
+        getStudentProfileDataRequestStatus    = RequestStatus.NOT_CALLED;
+        getScheduleRequestStatus              = RequestStatus.NOT_CALLED;
+        getStudentStatsRequestStatus          = RequestStatus.NOT_CALLED;
+    }
 
     // Функции по отправке запроса. Их нужно вызывать при жедании сделать запрос
 
@@ -1676,6 +1688,8 @@ public class MainActivity extends AppCompatActivity {
                 nowWeekScheduleCalled = false;
                 nextWeekScheduleCalled = false;
                 readyExercisesByLesson = new JSONObject();
+
+                resetRequestsStatuses();
 
                 setContainer(ContainerName.LOGIN);
                 Button submit = findViewById(R.id.loginFormSubmit);
