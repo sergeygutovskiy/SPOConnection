@@ -50,17 +50,6 @@ import java.util.List;
 //import com.example.spoconnection.Functions;
 
 
-/*
-    TODO
-    1. Дата сегодня - сделано
-    2. Построить праильно вызовы - сделано
-    3. Handlers - сделано
-    4. Обьект, где будут пары по кажому предмету
-    5. При копировании кода будут ошибки из-за переменных закоменченых - сделано
-    6. Main и ByDay одновременно - сделано
-    7. Сейчас при нажатии на какой-то предмет ничего не происходит, как и при нажатии на уведомления - сделано
-*/
-
 public class MainActivity extends AppCompatActivity {
 
     final long COOKIE_LIFETIME = 100; // в минутах. На самом деле 120 минут.
@@ -189,6 +178,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if (!nowWeekScheduleCalled) {
                     sendGetScheduleParsingRequest("now");
+                    setLoadingToList(ContainerName.SCHEDULE);
                     nowWeekScheduleCalled = true;
                 } else {
                     onGetScheduleRequestCompleted("now");
@@ -201,6 +191,7 @@ public class MainActivity extends AppCompatActivity {
             public void onClick(View v) {
                 if (!nextWeekScheduleCalled) {
                     sendGetScheduleParsingRequest("next");
+                    setLoadingToList(ContainerName.SCHEDULE);
                     nextWeekScheduleCalled = true;
                 } else {
                     onGetScheduleRequestCompleted("next");
@@ -223,9 +214,12 @@ public class MainActivity extends AppCompatActivity {
         activeContainer = ContainerName.LOADING;
 
 
+
         preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
 
         appFirstRun = preferences.getBoolean("appFirstRun", true);
+        System.out.println(preferences.getAll());
+
         // первый запуск
         if (appFirstRun) {
 
@@ -253,8 +247,8 @@ public class MainActivity extends AppCompatActivity {
             System.out.println("App first run");
             preferencesEditor = preferences.edit();
 
-            preferencesEditor.putBoolean("appFirstRun", false);
-            preferencesEditor.apply();
+//            preferencesEditor.putBoolean("appFirstRun", false);
+//            preferencesEditor.apply();
         } else {
             System.out.println("Not app first run");
             String lastLoginRequestTime = preferences.getString("lastLoginRequest", "");
@@ -392,6 +386,21 @@ public class MainActivity extends AppCompatActivity {
         request.execute();
     }
 
+    // Когда отпраили все запросы для входа в акаунт
+    public void onAuthCompleted() {
+        if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
+            && getStudentMainDataRequestStatus == RequestStatus.COMPLETED
+            && getExercisesByDayRequestStatus  == RequestStatus.COMPLETED
+        ) {
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
+            preferencesEditor.putBoolean("appFirstRun", false);
+            preferencesEditor.apply();
+
+            buildFrontend();
+        }
+    }
+
 
     // Колбеки, которые вызываются при завершении определенного запроса
 
@@ -498,7 +507,9 @@ public class MainActivity extends AppCompatActivity {
 //                    buildFrontend();
 //                }
 
-                buildFrontend();
+//                buildFrontend();
+
+                onAuthCompleted();
 
             } catch (JSONException e) {
                 System.out.println(e.toString());
@@ -538,8 +549,10 @@ public class MainActivity extends AppCompatActivity {
 
             // берем нужный предмет
             JSONArray buffer = exercisesByLesson;
+            LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
+            lessonsInformationList.removeAllViews();
 
-             // выкидываем информацию о паре
+            // выкидываем информацию о паре
             for (int k = 0; k < buffer.length(); k++) {
                 JSONObject value;
                 try {
@@ -588,7 +601,7 @@ public class MainActivity extends AppCompatActivity {
                     }
 
 
-                    LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
+
 
                     // опять же id - ключ для следующего массива
 
@@ -636,6 +649,8 @@ public class MainActivity extends AppCompatActivity {
             JSONArray value;
             try {
                 value = vkWallPosts.getJSONArray("items");
+                LinearLayout notificationList = findViewById(R.id.notificationList);
+                notificationList.removeAllViews();
 
                 for (int i = 0; i < value.length(); i++) {
 
@@ -657,7 +672,6 @@ public class MainActivity extends AppCompatActivity {
                             TextView note = new TextView(getApplicationContext());
                             note.setLayoutParams(lp);
                             note.setText( (i+1) + " пост (" + new Date(Long.parseLong(tmp.getString("date"))*1000) + "):    " + tmp.getString("text"));
-                            LinearLayout notificationList = findViewById(R.id.notificationList);
                             notificationList.addView(note);
                         }
 
@@ -1386,6 +1400,7 @@ public class MainActivity extends AppCompatActivity {
                 break;
             }
             case LOGIN: {
+                main.removeAllViews();
                 main.addView(loginForm);
                 activeContainer = ContainerName.LOGIN;
                 break;
@@ -1393,6 +1408,29 @@ public class MainActivity extends AppCompatActivity {
             case LOADING: {
                 main.addView(loadingScreen);
                 activeContainer = ContainerName.LOADING;
+            }
+        }
+    }
+
+    public void setLoadingToList(ContainerName neededContainer) { // функция обновления активного контейнера
+        switch (neededContainer) {
+            case SCHEDULE: {
+                LinearLayout box = findViewById(R.id.scheduleList);
+                box.removeAllViews();
+                box.addView(loadingScreen);
+                break;
+            }
+            case LESSONS_INFORMATION: {
+                LinearLayout box = findViewById(R.id.lessonsInformationList);
+                box.removeAllViews();
+                box.addView(loadingScreen);
+                break;
+            }
+            case NOTIFICATION: {
+                LinearLayout box = findViewById(R.id.notificationList);
+                box.removeAllViews();
+                box.addView(loadingScreen);
+                break;
             }
         }
     }
@@ -1478,6 +1516,7 @@ public class MainActivity extends AppCompatActivity {
         userHelp = findViewById(R.id.notification);
 
 
+
         // наш обработчик кликов
 
         navigationButtonClickListener wasClicked = new navigationButtonClickListener();
@@ -1497,7 +1536,7 @@ public class MainActivity extends AppCompatActivity {
         TextView text = new TextView(this);
         LinearLayout.LayoutParams lpText = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
         lpText.setMargins(50,50,50,50);
-        text.setText(studentFIO + " - " + studentGroup);
+        text.setText(studentFIO + " - " + studentGroup + " " + statsDebtsCount + " долгов " + statsMidMark + " средний балл " + statsPercentageOfVisits +" посещений");
         profileScreen.addView(text);
 
         final LinearLayout todayLessonsView = (LinearLayout) findViewById(R.id.todayLessonsView);
@@ -1629,7 +1668,30 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (v.getId() == exit.getId()) {
-                System.out.println("You clicked exit");
+                preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+                preferencesEditor = preferences.edit();
+                preferencesEditor.clear();
+                preferencesEditor.apply();
+
+                nowWeekScheduleCalled = false;
+                nextWeekScheduleCalled = false;
+                readyExercisesByLesson = new JSONObject();
+
+                setContainer(ContainerName.LOGIN);
+                Button submit = findViewById(R.id.loginFormSubmit);
+                final TextInputEditText login = findViewById(R.id.loginFormLogin);
+                final TextInputEditText password = findViewById(R.id.loginFormPassword);
+                submit.setOnClickListener(new View.OnClickListener() {
+
+                    // отправляем запрос
+                    @Override
+                    public void onClick(View v) {
+                        sendLoginRequest(new String[] {
+                                login.getText().toString(),
+                                password.getText().toString()
+                        });
+                    }
+                });
             }
 
             // но если кликнута кнопка изменений в расписании, нужно еще выкинуть контент от вк
@@ -1639,6 +1701,8 @@ public class MainActivity extends AppCompatActivity {
             if (activeContainer == ContainerName.NOTIFICATION) {
 
                 sendGetVKWallPostsRequest(new String[] {"10"});
+                setLoadingToList(ContainerName.NOTIFICATION);
+
 
             }
 
@@ -1661,12 +1725,11 @@ public class MainActivity extends AppCompatActivity {
             activeContainer = ContainerName.LESSONS_INFORMATION;
             main.addView(lessonsInformationScreen);
 
-            LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
 
+            LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
 
             // очищаем scrollview
 
-            lessonsInformationList.removeAllViews();
 
             JSONArray buffer = null;
             try {
@@ -1676,6 +1739,7 @@ public class MainActivity extends AppCompatActivity {
             }
             System.out.println(buffer);
             if (buffer == null) {
+                setLoadingToList(ContainerName.LESSONS_INFORMATION);
                 sendGetExercisesByLessonRequest(new String[] {v.getId()+""});
             } else {
 
