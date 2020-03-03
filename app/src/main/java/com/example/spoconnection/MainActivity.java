@@ -355,6 +355,25 @@ public class MainActivity extends AppCompatActivity {
         getStudentStatsRequestStatus          = RequestStatus.NOT_CALLED;
     }
 
+    // Когда отпраили все запросы для входа в акаунт
+    public void onAuthCompleted() {
+        if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
+                && getStudentMainDataRequestStatus == RequestStatus.COMPLETED
+                && getExercisesByDayRequestStatus  == RequestStatus.COMPLETED
+        ) {
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
+            preferencesEditor.putBoolean("appFirstRun", false);
+            preferencesEditor.apply();
+
+            buildFrontend();
+        }
+    }
+
+    public void getStudentAvatar() {
+
+    }
+
     // Функции по отправке запроса. Их нужно вызывать при жедании сделать запрос
 
     private void sendLoginRequest(String[] params) {
@@ -404,21 +423,6 @@ public class MainActivity extends AppCompatActivity {
         getStudentStatsRequest request = new getStudentStatsRequest();
         getStudentStatsRequestStatus = RequestStatus.CALLED;
         request.execute();
-    }
-
-    // Когда отпраили все запросы для входа в акаунт
-    public void onAuthCompleted() {
-        if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
-            && getStudentMainDataRequestStatus == RequestStatus.COMPLETED
-            && getExercisesByDayRequestStatus  == RequestStatus.COMPLETED
-        ) {
-            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
-            preferencesEditor = preferences.edit();
-            preferencesEditor.putBoolean("appFirstRun", false);
-            preferencesEditor.apply();
-
-            buildFrontend();
-        }
     }
 
 
@@ -916,15 +920,15 @@ public class MainActivity extends AppCompatActivity {
 
 
             // создаем мап для картинки
-
-//            try {
-//                bitmap = BitmapFactory.decodeStream((InputStream)new URL("https://ifspo.ifmo.ru" + studentAvatarSrc).getContent());
-//            } catch (MalformedURLException e) {
-//                e.printStackTrace();
-//            } catch (IOException e) {
-//                e.printStackTrace();
-//            }
-
+            if (getStudentProfileDataRequestStatus == RequestStatus.COMPLETED) {
+                try {
+                    bitmap = BitmapFactory.decodeStream((InputStream) new URL("https://ifspo.ifmo.ru" + studentAvatarSrc).getContent());
+                } catch (MalformedURLException e) {
+                    e.printStackTrace();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
 
             try {
                 String url_address = "https://ifspo.ifmo.ru/profile/getStudentLessonsVisits"
