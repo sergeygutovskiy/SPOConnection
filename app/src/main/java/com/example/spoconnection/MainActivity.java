@@ -37,6 +37,7 @@ import java.io.InputStream;
 import java.io.InputStreamReader;
 import java.net.HttpURLConnection;
 import java.net.MalformedURLException;
+import java.net.SocketTimeoutException;
 import java.net.URL;
 import java.net.URLDecoder;
 
@@ -53,6 +54,13 @@ import java.util.List;
 public class MainActivity extends AppCompatActivity {
 
     final long COOKIE_LIFETIME = 100; // в минутах. На самом деле 120 минут.
+
+    final Integer STATS_REQUEST_TIMEOUT = 7; // в секундах
+    final Integer MAIN_DATA_REQUEST_TIMEOUT = 7;
+    final Integer STUDENT_PROFILE_REQUEST_TIMEOUT = 7;
+    final Integer SCHEDULE_REQUEST_TIMEOUT = 7;
+    final Integer EXERCISES_BY_DAY_REQUEST_TIMEOUT = 7;
+    final Integer EXERCISES_BY_LESSON_REQUEST_TIMEOUT = 7;
 
     // Переменные, получаемые с запросов
 
@@ -90,7 +98,7 @@ public class MainActivity extends AppCompatActivity {
         Если возвращает пустой response - EMPTY_RESPONSE        // Эти два значения задаются в функции колбеке on...RequestCompleted()
         Если возвращает тело response - COMPLETED               //
     */
-    enum RequestStatus {NOT_CALLED, CALLED, COMPLETED, FAILED, EMPTY_RESPONSE}
+    enum RequestStatus {NOT_CALLED, CALLED, COMPLETED, TIMEOUT, EMPTY_RESPONSE}
 
     RequestStatus loginRequestStatus;
     RequestStatus getStudentMainDataRequestStatus;
@@ -246,7 +254,7 @@ public class MainActivity extends AppCompatActivity {
             });
 
             System.out.println("App first run");
-            preferencesEditor = preferences.edit();
+//            preferencesEditor = preferences.edit();
 
 //            preferencesEditor.putBoolean("appFirstRun", false);
 //            preferencesEditor.apply();
@@ -459,7 +467,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetStudentMainDataRequestCompleted(String responseBody) {
-        if (!responseBody.isEmpty()) {
+
+        if (getStudentMainDataRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (!responseBody.isEmpty()) {
             getStudentMainDataRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetStudentMainData Success!");
@@ -498,11 +509,11 @@ public class MainActivity extends AppCompatActivity {
             JSONObject jsonData;
             try {
                 jsonData = new JSONObject(responseBody);
-                System.out.println(jsonData.toString());
+//                System.out.println(jsonData.toString());
 
                 exercisesByDay = jsonData.getJSONArray("todayExercises");
 
-                System.out.println(jsonData.get("todayExercisesVisits"));
+//                System.out.println(jsonData.get("todayExercisesVisits"));
 
                 if (!jsonData.get("todayExercisesVisits").equals(null))
                     exercisesVisitsByDay = jsonData.getJSONObject("todayExercisesVisits");
@@ -897,19 +908,22 @@ public class MainActivity extends AppCompatActivity {
     class getStudentMainDataRequest extends AsyncTask<String[], Void, String> {
 
         protected String doInBackground(String[]... params) { // params[0][0] - year, params[0][1] - month
+
+            System.out.println("Student main data request called");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
 
             // создаем мап для картинки
 
-            try {
-                bitmap = BitmapFactory.decodeStream((InputStream)new URL("https://ifspo.ifmo.ru" + studentAvatarSrc).getContent());
-            } catch (MalformedURLException e) {
-                e.printStackTrace();
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+//            try {
+//                bitmap = BitmapFactory.decodeStream((InputStream)new URL("https://ifspo.ifmo.ru" + studentAvatarSrc).getContent());
+//            } catch (MalformedURLException e) {
+//                e.printStackTrace();
+//            } catch (IOException e) {
+//                e.printStackTrace();
+//            }
 
 
             try {
@@ -919,8 +933,13 @@ public class MainActivity extends AppCompatActivity {
                         + "&datemonth=" + params[0][1];
 
                 urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                urlConnection.setConnectTimeout(MAIN_DATA_REQUEST_TIMEOUT * 1000);
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
+            } catch (SocketTimeoutException e) {
+                System.out.println("Main data request timeout!");
+                getStudentMainDataRequestStatus = RequestStatus.TIMEOUT;
+                return "";
             } catch (Exception e) {
                 System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
@@ -1062,12 +1081,16 @@ public class MainActivity extends AppCompatActivity {
 
             Element row;
 
-            Integer bodyRowsCount = html.body().getElementsByClass("row").size();
-            if (bodyRowsCount > 1) {
-                row = html.body().getElementsByClass("row").get(1);
-            } else {
-                row = html.body().getElementsByClass("row").get(0);
-            }
+//            Integer bodyRowsCount = html.body().getElementsByClass("row").size();
+//            if (bodyRowsCount > 1) {
+//                row = html.body().children().getElementsByClass("row").get(bodyRowsCount - 1);
+//            } else {
+//                row = html.body()getElementsByClass("row").get(0);
+//            }
+
+            row = html.body().getElementsByClass("row").get(2);
+
+//            System.out.println(row.toString());
 
             studentFIO = row.getElementsByClass("span9").select("h3").get(0).text();
             studentGroup = row.getElementsByClass("span9").get(0)
