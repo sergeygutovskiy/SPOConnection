@@ -55,12 +55,15 @@ public class MainActivity extends AppCompatActivity {
 
     final long COOKIE_LIFETIME = 100; // в минутах. На самом деле 120 минут.
 
-    final Integer STATS_REQUEST_TIMEOUT = 7; // в секундах
-    final Integer MAIN_DATA_REQUEST_TIMEOUT = 7;
-    final Integer STUDENT_PROFILE_REQUEST_TIMEOUT = 7;
-    final Integer SCHEDULE_REQUEST_TIMEOUT = 7;
-    final Integer EXERCISES_BY_DAY_REQUEST_TIMEOUT = 7;
-    final Integer EXERCISES_BY_LESSON_REQUEST_TIMEOUT = 7;
+
+    final Integer STATS_REQUEST_TIMEOUT                 = 5; // в секундах
+    final Integer LOGIN_REQUEST_TIMEOUT                 = 5;
+    final Integer MAIN_DATA_REQUEST_TIMEOUT             = 5;
+    final Integer STUDENT_PROFILE_REQUEST_TIMEOUT       = 5;
+    final Integer SCHEDULE_REQUEST_TIMEOUT              = 5;
+    final Integer EXERCISES_BY_DAY_REQUEST_TIMEOUT      = 5;
+    final Integer EXERCISES_BY_LESSON_REQUEST_TIMEOUT   = 5;
+    final Integer VK_POSTS_REQUEST_TIMEOUT              = 5;
 
     // Переменные, получаемые с запросов
 
@@ -433,7 +436,9 @@ public class MainActivity extends AppCompatActivity {
         String studentName = response[1];
         String studentPassword = response[2];
 
-        if (!cookie.isEmpty()) {
+        if (loginRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (!cookie.isEmpty()) {
             loginRequestStatus = RequestStatus.COMPLETED;
 
             authCookie = cookie;
@@ -485,8 +490,8 @@ public class MainActivity extends AppCompatActivity {
                 studentLessons = jsonData.getJSONArray("userlessons");
                 teachers = jsonData.getJSONObject("lessonteachers");
 
-                System.out.println("StudentLessons: " + studentLessons.toString());
-                System.out.println("Teachers: " + teachers.toString());
+//                System.out.println("StudentLessons: " + studentLessons.toString());
+//                System.out.println("Teachers: " + teachers.toString());
 
 //                if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED
 //                        && getStudentProfileDataRequestStatus == RequestStatus.COMPLETED
@@ -506,26 +511,29 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetExercisesByDayRequestCompleted (String responseBody) {
-        if (!responseBody.isEmpty()) {
+
+        if (getExercisesByDayRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (!responseBody.isEmpty()) {
             getExercisesByDayRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetExercisesByDay Success!");
             JSONObject jsonData;
             try {
                 jsonData = new JSONObject(responseBody);
-//                System.out.println(jsonData.toString());
 
                 exercisesByDay = jsonData.getJSONArray("todayExercises");
 
 //                System.out.println(jsonData.get("todayExercisesVisits"));
+//                System.out.println(jsonData.toString());
 
                 if (!jsonData.get("todayExercisesVisits").equals(null))
                     exercisesVisitsByDay = jsonData.getJSONObject("todayExercisesVisits");
                 else
                     exercisesVisitsByDay = new JSONObject();
-                System.out.println("TodayExercises: " + exercisesByDay.toString());
-                System.out.println("TodayExercisesVisits: " + exercisesVisitsByDay.toString());
-
+//                System.out.println("TodayExercises: " + exercisesByDay.toString());
+//                System.out.println("TodayExercisesVisits: " + exercisesVisitsByDay.toString());
+//
 //                if (getStudentMainDataRequestStatus == RequestStatus.COMPLETED
 //                        && getStudentProfileDataRequestStatus == RequestStatus.COMPLETED
 //                        && !buildFrontendCalled)
@@ -533,7 +541,7 @@ public class MainActivity extends AppCompatActivity {
 //                    buildFrontendCalled = true;
 //                    buildFrontend();
 //                }
-
+//
 //                buildFrontend();
 
                 onAuthCompleted();
@@ -548,10 +556,13 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetExercisesByLessonRequestCompleted (String[] response) {
+
         String responseBody = response[0];
         String lessonId = response[1];
 
-        if (!responseBody.isEmpty() && activeContainer == ContainerName.LESSONS_INFORMATION) {
+        if (getExercisesByLessonRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (!responseBody.isEmpty() && activeContainer == ContainerName.LESSONS_INFORMATION) {
             getExercisesByLessonRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetExercisesByLesson Success!");
@@ -565,11 +576,11 @@ public class MainActivity extends AppCompatActivity {
                 exercisesByLessonAmount = jsonData.getInt("all");
                 exercisesByLessonVisitsAmount = jsonData.getInt("was");
 
-                System.out.println("exercisesByLesson: " + exercisesByLesson.toString());
-                System.out.println("exercisesByLessonVisits: " + exercisesByLessonVisits.toString());
-                System.out.println("exercisesByLessonTeacher: " + exercisesByLessonTeacher.toString());
-                System.out.println("exercisesByLessonAmount: " + exercisesByLessonAmount.toString());
-                System.out.println("exercisesByLessonVisitsAmount: " + exercisesByLessonVisitsAmount.toString());
+//                System.out.println("exercisesByLesson: " + exercisesByLesson.toString());
+//                System.out.println("exercisesByLessonVisits: " + exercisesByLessonVisits.toString());
+//                System.out.println("exercisesByLessonTeacher: " + exercisesByLessonTeacher.toString());
+//                System.out.println("exercisesByLessonAmount: " + exercisesByLessonAmount.toString());
+//                System.out.println("exercisesByLessonVisitsAmount: " + exercisesByLessonVisitsAmount.toString());
             } catch (JSONException e) {
 
             }
@@ -657,7 +668,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetVKWallPostsRequestCompleted (String responseBody) {
-        if (!responseBody.isEmpty() && activeContainer == ContainerName.NOTIFICATION) {
+
+        if (getVKWallPostsRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (!responseBody.isEmpty() && activeContainer == ContainerName.NOTIFICATION) {
             getVKWallPostsRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetVKWallPosts Success!");
@@ -723,7 +737,9 @@ public class MainActivity extends AppCompatActivity {
         String studentGroup = response[1];
         String studentAvatarSrc = response[2];
 
-        if ( !(studentFIO.isEmpty() || studentGroup.isEmpty() || studentAvatarSrc.isEmpty()) ) {
+        if (getStudentProfileDataRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if ( !(studentFIO.isEmpty() || studentGroup.isEmpty() || studentAvatarSrc.isEmpty()) ) {
             getStudentProfileDataRequestStatus = RequestStatus.COMPLETED;
 
             preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
@@ -754,7 +770,10 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetScheduleRequestCompleted(String param) {
-        if (getScheduleRequestStatus == RequestStatus.COMPLETED && activeContainer == ContainerName.SCHEDULE) {
+
+        if (getScheduleRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (getScheduleRequestStatus == RequestStatus.COMPLETED && activeContainer == ContainerName.SCHEDULE) {
 
             LinearLayout box = findViewById(R.id.scheduleList);
             box.removeAllViews();
@@ -832,11 +851,14 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetStudentStatsRequestCompleted(String[] response) {
+
         String statsMidMark = response[0];
         String statsDebtsCount = response[1];
         String statsPercentageOfVisits = response[2];
 
-        if ( !(statsDebtsCount.isEmpty() || statsDebtsCount.isEmpty() || statsPercentageOfVisits.isEmpty()) ) {
+        if (getStudentStatsRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if ( !(statsDebtsCount.isEmpty() || statsDebtsCount.isEmpty() || statsPercentageOfVisits.isEmpty()) ) {
             getStudentStatsRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("StudentStats Success!");
@@ -871,6 +893,8 @@ public class MainActivity extends AppCompatActivity {
                 int postDataLength = postData.length;
 
                 urlConnection.setRequestMethod("POST");
+                urlConnection.setReadTimeout(LOGIN_REQUEST_TIMEOUT * 1000);
+
                 urlConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
                 urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
                 urlConnection.setRequestProperty("Content-Length", Integer.toString(postDataLength));
@@ -889,6 +913,10 @@ public class MainActivity extends AppCompatActivity {
                 if (cookies_count > 1) {
                     cookie = cookies.get(cookies_count - 1);
                 }
+            } catch (SocketTimeoutException e) {
+                System.out.println("Login request timeout!");
+                loginRequestStatus = RequestStatus.TIMEOUT;
+                return new String[] {"", "", ""};
             } catch (Exception e) {
                 System.out.println("Problems with login request");
                 System.out.println(e.toString());
@@ -936,8 +964,7 @@ public class MainActivity extends AppCompatActivity {
                         + "&dateyear=" + params[0][0]
                         + "&datemonth=" + params[0][1];
 
-                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
-                urlConnection.setConnectTimeout(MAIN_DATA_REQUEST_TIMEOUT * 1000);
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie, MAIN_DATA_REQUEST_TIMEOUT);
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
             } catch (SocketTimeoutException e) {
@@ -971,9 +998,13 @@ public class MainActivity extends AppCompatActivity {
                         + "?lesson=" + params[0][0]
                         + "&student=" + studentId;
 
-                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie, EXERCISES_BY_LESSON_REQUEST_TIMEOUT);
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
+            } catch (SocketTimeoutException e) {
+                System.out.println("Exercises by lesson request timeout!");
+                getExercisesByLessonRequestStatus = RequestStatus.TIMEOUT;
+                return new String[] {"", ""};
             } catch (Exception e) {
                 System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
@@ -1001,9 +1032,13 @@ public class MainActivity extends AppCompatActivity {
                         + "?student=" + studentId
                         + "&day=" + params[0][0];
 
-                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie, EXERCISES_BY_DAY_REQUEST_TIMEOUT);
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
+            } catch (SocketTimeoutException e) {
+                System.out.println("Exercises by day request timeout!");
+                getExercisesByDayRequestStatus = RequestStatus.TIMEOUT;
+                return "";
             } catch (Exception e) {
                 System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
@@ -1031,9 +1066,13 @@ public class MainActivity extends AppCompatActivity {
                         + "&count=" + params[0][0]
                         + "&filter=owner&access_token=c2cb19e3c2cb19e3c2cb19e339c2a4f3d6cc2cbc2cb19e39c9fe125dc37c9d4bb7994cd&v=5.103";
 
-                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie, VK_POSTS_REQUEST_TIMEOUT);
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
+            } catch (SocketTimeoutException e) {
+                System.out.println("VK posts request timeout!");
+                getVKWallPostsRequestStatus = RequestStatus.TIMEOUT;
+                return "";
             } catch (Exception e) {
                 System.out.println("Problems with getStudentMainData request");
                 System.out.println(e.toString());
@@ -1061,11 +1100,15 @@ public class MainActivity extends AppCompatActivity {
             try {
                 String url_address = "https://ifspo.ifmo.ru/profile";
 
-                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie);
+                urlConnection = Functions.setupGetAuthRequest(url_address, authCookie, STUDENT_PROFILE_REQUEST_TIMEOUT);
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
                 html = Jsoup.parse(responseBody);
 
+            } catch (SocketTimeoutException e) {
+                System.out.println("Student profile data request timeout!");
+                getStudentProfileDataRequestStatus = RequestStatus.TIMEOUT;
+                return new String[] {"", "", ""};
             } catch (Exception e) {
                 System.out.println("Problems with GetProfileParsing request");
                 System.out.println(e.toString());
@@ -1141,6 +1184,8 @@ public class MainActivity extends AppCompatActivity {
                 urlConnection = (HttpURLConnection) url.openConnection();
 
                 urlConnection.setRequestMethod("GET");
+                urlConnection.setReadTimeout(SCHEDULE_REQUEST_TIMEOUT * 1000);
+
                 urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
                 urlConnection.setRequestProperty("Cookie", authCookie);
                 urlConnection.setUseCaches(false);
@@ -1162,8 +1207,12 @@ public class MainActivity extends AppCompatActivity {
 
                 responseBody = response.toString();
                 html = Jsoup.parse(responseBody);
+            } catch (SocketTimeoutException e) {
+                System.out.println("Schedule request timeout!");
+                getScheduleRequestStatus = RequestStatus.TIMEOUT;
+                return "";
             } catch (Exception e) {
-                System.out.println("Problems with sheduleParsing request");
+                System.out.println("Problems with scheduleParsing request");
                 System.out.println(e.toString());
             } finally {
                 if (urlConnection != null) {
@@ -1292,6 +1341,8 @@ public class MainActivity extends AppCompatActivity {
                 int postDataLength = postData.length;
 
                 urlConnection.setRequestMethod("POST");
+                urlConnection.setReadTimeout(STATS_REQUEST_TIMEOUT * 1000);
+
                 urlConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
                 urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
                 urlConnection.setRequestProperty("Content-Length", Integer.toString(postDataLength));
@@ -1315,6 +1366,10 @@ public class MainActivity extends AppCompatActivity {
                 statsPercentageOfVisits = stats.get(2).getElementsByClass("stat-value").get(0).text();
                 System.out.println(statsMidMark + " " + statsDebtsCount + " " + statsPercentageOfVisits);
 
+            } catch (SocketTimeoutException e) {
+                System.out.println("Student stats request timeout!");
+                getStudentStatsRequestStatus = RequestStatus.TIMEOUT;
+                return new String[] {"", "", ""};
             } catch (Exception e) {
                 System.out.println("Problems with statistics request");
                 System.out.println(e.toString());
