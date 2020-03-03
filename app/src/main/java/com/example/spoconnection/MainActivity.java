@@ -53,7 +53,7 @@ import java.util.List;
 
 public class MainActivity extends AppCompatActivity {
 
-    final long COOKIE_LIFETIME = 100; // в минутах. На самом деле 120 минут.
+    final long COOKIE_LIFETIME = 90; // в минутах. На самом деле 120 минут.
 
 
     final Integer STATS_REQUEST_TIMEOUT                 = 5; // в секундах
@@ -125,7 +125,8 @@ public class MainActivity extends AppCompatActivity {
     // контейнеры
 
     public RelativeLayout main;
-    public RelativeLayout profileScreen;
+//    public RelativeLayout profileScreen;
+    public LinearLayout profileScreen;
     public RelativeLayout loginForm;
     public LinearLayout navigation;
     public RelativeLayout homeScreen;
@@ -182,6 +183,16 @@ public class MainActivity extends AppCompatActivity {
         scheduleChanges = findViewById(R.id.notificationSchedule);
         scheduleNow = findViewById(R.id.now);
         scheduleNext = findViewById(R.id.next);
+
+        // инициаизируем переменные для очистки их при выходе (важно)
+        profileUserName = findViewById(R.id.profileUserName);
+        profileUserGroup = findViewById(R.id.profileUserGroup);
+        profileUserCalendar = findViewById(R.id.profileUserCalendar);
+        profileUserBalls = findViewById(R.id.profileUserBalls);
+        profileUserBills = findViewById(R.id.profileUserBills);
+
+        // локальные кнопки экранов
+        scheduleChanges = findViewById(R.id.notificationSchedule);
 
         // запросы для расписания отправляются только 1 раз
 
@@ -373,9 +384,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void getStudentAvatar() {
-
-    }
 
     // Функции по отправке запроса. Их нужно вызывать при жедании сделать запрос
 
@@ -470,6 +478,24 @@ public class MainActivity extends AppCompatActivity {
             sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
 
         } else {
+            resetRequestsStatuses();
+
+            setContainer(ContainerName.LOGIN);
+            Button submit = findViewById(R.id.loginFormSubmit);
+            final TextInputEditText login = findViewById(R.id.loginFormLogin);
+            final TextInputEditText password = findViewById(R.id.loginFormPassword);
+            submit.setOnClickListener(new View.OnClickListener() {
+
+                // отправляем запрос
+                @Override
+                public void onClick(View v) {
+                    sendLoginRequest(new String[] {
+                            login.getText().toString(),
+                            password.getText().toString()
+                    });
+                }
+            });
+
             loginRequestStatus = RequestStatus.EMPTY_RESPONSE;
             System.out.println("Login request empty response!");
         }
@@ -1122,22 +1148,16 @@ public class MainActivity extends AppCompatActivity {
             String studentGroup = "";
             String avatarSrc = "";
 
-            String statsMidMark = "";
-            String statsDebtsCount = "";
-            String statsPercentageOfVisits = "";
+            Element row = null;
 
-            Element row;
 
-//            Integer bodyRowsCount = html.body().getElementsByClass("row").size();
-//            if (bodyRowsCount > 1) {
-//                row = html.body().children().getElementsByClass("row").get(bodyRowsCount - 1);
-//            } else {
-//                row = html.body()getElementsByClass("row").get(0);
-//            }
-
-            row = html.body().getElementsByClass("row").get(2);
-
-//            System.out.println(row.toString());
+            Elements rows = html.body().getElementsByClass("container").get(0).getElementsByClass("row");
+            for (Element el : rows) {
+                if (el.childrenSize() > 1) {
+                    row = el;
+                    break;
+                }
+            }
 
             studentFIO = row.getElementsByClass("span9").select("h3").get(0).text();
             studentGroup = row.getElementsByClass("span9").get(0)
@@ -1364,6 +1384,9 @@ public class MainActivity extends AppCompatActivity {
                 statsMidMark = stats.get(0).getElementsByClass("stat-value").get(0).text();
                 statsDebtsCount = stats.get(1).getElementsByClass("stat-value").get(0).text();
                 statsPercentageOfVisits = stats.get(2).getElementsByClass("stat-value").get(0).text();
+
+                statsMidMark = statsMidMark.substring(0, statsMidMark.length() - 1);
+
                 System.out.println(statsMidMark + " " + statsDebtsCount + " " + statsPercentageOfVisits);
 
             } catch (SocketTimeoutException e) {
@@ -1410,16 +1433,27 @@ public class MainActivity extends AppCompatActivity {
 
     // кнопки нужны глобально
 
-    Button home;
-    Button schedule;
-    Button profile;
-    Button lessons;
-    Button exit;
+    ImageView home;
+    ImageView schedule;
+    ImageView profile;
+    ImageView lessons;
+    ImageView exit;
 
-    Button userHelp;
+    ImageView userHelp;
     Button scheduleChanges;
     Button scheduleNow;
     Button scheduleNext;
+
+
+    // ПОД ОЧИСТКУ ОЧЕНЬ ОЧЕНЬ ВАЖНО
+
+    TextView profileUserName;
+    TextView profileUserGroup;
+    TextView profileUserCalendar;
+    TextView profileUserBalls;
+    TextView profileUserBills;
+
+
 
     // переменная для мониторинга активного контейнера
 
@@ -1627,11 +1661,17 @@ public class MainActivity extends AppCompatActivity {
 
         // под удаление - вывод инфы о юзере
 
-        TextView text = new TextView(this);
-        LinearLayout.LayoutParams lpText = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-        lpText.setMargins(50,50,50,50);
-        text.setText(studentFIO + " - " + studentGroup + " " + statsDebtsCount + " долгов " + statsMidMark + " средний балл " + statsPercentageOfVisits +" посещений");
-        profileScreen.addView(text);
+//        TextView text = new TextView(this);
+//        LinearLayout.LayoutParams lpText = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+//        lpText.setMargins(50,50,50,50);
+//        text.setText(studentFIO + " - " + studentGroup + " " + statsDebtsCount + " долгов " + statsMidMark + " средний балл " + statsPercentageOfVisits +" посещений");
+//        profileScreen.addView(text);
+
+        profileUserName.setText(studentFIO.split(" ")[0] + " "+ studentFIO.split(" ")[1]);
+        profileUserGroup.setText(studentGroup);
+        profileUserCalendar.setText(statsPercentageOfVisits);
+        profileUserBalls.setText(statsMidMark);
+        profileUserBills.setText(statsDebtsCount);
 
         final LinearLayout todayLessonsView = (LinearLayout) findViewById(R.id.todayLessonsView);
 
