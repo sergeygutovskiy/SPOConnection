@@ -33,13 +33,15 @@ public class Functions {
         return "";
     }
 
-    public static HttpURLConnection setupGETAuthRequest(String address, String authCookie, Integer timeout) throws IOException {
+    public static HttpURLConnection setupGETAuthRequest(String address, String authCookie, Integer connectTimeout, Integer readTimeout) throws IOException {
 
         URL url = new URL(address);
         HttpURLConnection con = (HttpURLConnection) url.openConnection();
         con.setRequestMethod("GET");
 
-        con.setReadTimeout(timeout * 1000);
+        con.setConnectTimeout(connectTimeout * 1000);
+        con.setReadTimeout(readTimeout * 1000);
+
         con.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
         con.setRequestProperty("Cookie", authCookie);
         con.setUseCaches(false);
@@ -70,7 +72,7 @@ public class Functions {
         return userIdDirty.substring(1, userIdDirty.length() - 2);
     }
 
-    public static HttpURLConnection setupPOSTAuthRequest(String address, String urlParameters, String authCookie, Integer timeout) throws IOException {
+    public static HttpURLConnection setupPOSTAuthRequest(String address, String urlParameters, String authCookie, Integer connectTimeout, Integer readTimeout) throws IOException {
 
         URL url = new URL(address);
         HttpURLConnection urlConnection = (HttpURLConnection) url.openConnection();
@@ -79,7 +81,8 @@ public class Functions {
         int postDataLength = postData.length;
 
         urlConnection.setRequestMethod("POST");
-        urlConnection.setReadTimeout(timeout * 1000);
+        urlConnection.setConnectTimeout(connectTimeout * 1000);
+        urlConnection.setReadTimeout(readTimeout * 1000);
 
         urlConnection.setRequestProperty("Content-Type", "application/x-www-form-urlencoded; charset=UTF-8");
         urlConnection.setRequestProperty("User-Agent", "Mozilla/5.0 (Windows NT 6.3; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/79.0.3945.130 Safari/537.36 OPR/66.0.3515.95");
