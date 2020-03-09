@@ -11,6 +11,7 @@ import android.graphics.Bitmap;
 import android.graphics.BitmapFactory;
 import android.graphics.Color;
 import android.graphics.Typeface;
+import android.graphics.drawable.AnimationDrawable;
 import android.graphics.drawable.GradientDrawable;
 
 import android.os.Bundle;
@@ -21,6 +22,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
+import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.ImageView;
 import android.widget.LinearLayout;
@@ -75,6 +77,7 @@ public class MainActivity extends AppCompatActivity {
     final Integer EXERCISES_BY_DAY_REQUEST_CONNECT_TIMEOUT      = 5;
     final Integer EXERCISES_BY_LESSON_REQUEST_CONNECT_TIMEOUT   = 5;
     final Integer VK_POSTS_REQUEST_CONNECT_TIMEOUT              = 5;
+    final Integer FINAL_MARKS_REQUEST_CONNECT_TIMEOUT           = 5;
 
     final Integer STATS_REQUEST_READ_TIMEOUT                 = 5;  // в секундах
     final Integer LOGIN_REQUEST_READ_TIMEOUT                 = 5;
@@ -84,6 +87,7 @@ public class MainActivity extends AppCompatActivity {
     final Integer EXERCISES_BY_DAY_REQUEST_READ_TIMEOUT      = 5;
     final Integer EXERCISES_BY_LESSON_REQUEST_READ_TIMEOUT   = 5;
     final Integer VK_POSTS_REQUEST_READ_TIMEOUT              = 5;
+    final Integer FINAL_MARKS_REQUEST_READ_TIMEOUT           = 5;
 
     // Переменные, получаемые с запросов
 
@@ -109,6 +113,8 @@ public class MainActivity extends AppCompatActivity {
     public JSONObject readyExercisesByLesson = new JSONObject();
     public JSONObject readyExercisesByLessonVisits = new JSONObject();
 
+    public JSONArray studentFinalMarks;
+
     // by vk api
     public JSONObject vkWallPosts;
 
@@ -131,10 +137,13 @@ public class MainActivity extends AppCompatActivity {
     RequestStatus getStudentProfileDataRequestStatus;
     RequestStatus getScheduleRequestStatus;
     RequestStatus getStudentStatsRequestStatus;
+    RequestStatus getFinalMarksRequestStatus;
 
 
     // Переменная, чтобы buildFrontend не вызвался дважды (и после getMainData и после getByDay)
 //    Boolean buildFrontendCalled = false;
+
+    int activeScheduleWeek = 0; // для мониторинга текущей недели при вызове сортировки по дню 0 - тек, 1 - след
 
     Boolean nowWeekScheduleCalled = false;
     Boolean nextWeekScheduleCalled = false;
@@ -173,6 +182,20 @@ public class MainActivity extends AppCompatActivity {
     SharedPreferences preferences;
     SharedPreferences.Editor preferencesEditor;
 
+    TextView monday;
+    TextView tuesday;
+    TextView wednesday;
+    TextView thursday;
+    TextView friday;
+    TextView saturday;
+
+    Boolean mondayIsActive = false;
+    Boolean tuesdayIsActive = false;
+    Boolean wednesdayIsActive = false;
+    Boolean thursdayIsActive = false;
+    Boolean fridayIsActive = false;
+    Boolean saturdayIsActive = false;
+
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -201,6 +224,40 @@ public class MainActivity extends AppCompatActivity {
         notificationListScreen = findViewById(R.id.notificationListScreen);
         loadingScreen = findViewById(R.id.loadingScreen);
 
+
+        // Инициализируем навигацию
+
+        homeNavImg = findViewById(R.id.homeNavImg);
+        homeNavText = findViewById(R.id.homeNavText);
+        scheduleNavImg = findViewById(R.id.scheduleNavImg);
+        scheduleNavText = findViewById(R.id.scheduleNavText);
+        profileNavImg = findViewById(R.id.profileNavImg);
+        profileNavText = findViewById(R.id.profileNavText);
+        lessonsNavImg = findViewById(R.id.lessonsNavImg);
+        lessonsNavText = findViewById(R.id.lessonsNavText);
+        settingsNavImg = findViewById(R.id.settingsNavImg);
+        settingsNavText = findViewById(R.id.settingsNavText);
+        notificationNavImg = findViewById(R.id.notificationNavImg);
+        notificationNavText = findViewById(R.id.notificationNavText);
+
+        // и кнопки расписания
+
+        scheduleDaysClickListener filtered = new scheduleDaysClickListener();
+
+        monday = findViewById(R.id.monday);
+        tuesday = findViewById(R.id.tuesday);
+        wednesday = findViewById(R.id.wednesday);
+        thursday = findViewById(R.id.thursday);
+        friday = findViewById(R.id.friday);
+        saturday = findViewById(R.id.saturday);
+
+        monday.setOnClickListener(filtered);
+        tuesday.setOnClickListener(filtered);
+        wednesday.setOnClickListener(filtered);
+        thursday.setOnClickListener(filtered);
+        friday.setOnClickListener(filtered);
+        saturday.setOnClickListener(filtered);
+
         // локальные кнопки экранов
 
 //        scheduleChanges = findViewById(R.id.notificationSchedule);
@@ -222,12 +279,55 @@ public class MainActivity extends AppCompatActivity {
         scheduleNow.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
+                if (mondayIsActive) {
+                    mondayIsActive = false;
+                    monday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (tuesdayIsActive) {
+                    tuesdayIsActive = false;
+                    tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (wednesdayIsActive) {
+                    wednesdayIsActive = false;
+                    wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (thursdayIsActive) {
+                    thursdayIsActive = false;
+                    thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (fridayIsActive) {
+                    fridayIsActive = false;
+                    friday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (saturdayIsActive) {
+                    saturdayIsActive = false;
+                    saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+
                 if (!nowWeekScheduleCalled) {
+                    activeScheduleWeek = 0;
+                    TextView nextView = findViewById(R.id.next);
+                    nextView.setBackgroundResource(R.drawable.passive_schedule);
+                    nextView.setTextColor(getResources().getColor(R.color.pinkColor));
+                    TextView nowView = findViewById(v.getId());
+                    nowView.setBackgroundResource(R.drawable.active_schedule);
+                    nowView.setTextColor(getResources().getColor(R.color.backgroundMainColor));
                     sendGetScheduleParsingRequest("now");
                     setLoadingToList(ContainerName.SCHEDULE);
                     nowWeekScheduleCalled = true;
                 } else {
-                    onGetScheduleRequestCompleted("now");
+                    activeScheduleWeek = 0;
+                    TextView nextView = findViewById(R.id.next);
+                    nextView.setBackgroundResource(R.drawable.passive_schedule);
+                    nextView.setTextColor(getResources().getColor(R.color.pinkColor));
+                    TextView nowView = findViewById(v.getId());
+                    nowView.setBackgroundResource(R.drawable.active_schedule);
+                    nowView.setTextColor(getResources().getColor(R.color.backgroundMainColor));
+                    LinearLayout scheduleList = findViewById(R.id.scheduleList);
+                    scheduleList.removeAllViews();
+                    setLoadingToList(ContainerName.SCHEDULE);
+                    onGetScheduleRequestCompleted("now", "");
                 }
             }
         });
@@ -235,13 +335,92 @@ public class MainActivity extends AppCompatActivity {
         scheduleNext.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
+
+                if (mondayIsActive) {
+                    mondayIsActive = false;
+                    monday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (tuesdayIsActive) {
+                    tuesdayIsActive = false;
+                    tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (wednesdayIsActive) {
+                    wednesdayIsActive = false;
+                    wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (thursdayIsActive) {
+                    thursdayIsActive = false;
+                    thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (fridayIsActive) {
+                    fridayIsActive = false;
+                    friday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+                if (saturdayIsActive) {
+                    saturdayIsActive = false;
+                    saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                }
+
                 if (!nextWeekScheduleCalled) {
+                    activeScheduleWeek = 1;
+                    TextView nextView = findViewById(R.id.now);
+                    nextView.setBackgroundResource(R.drawable.passive_schedule);
+                    nextView.setTextColor(getResources().getColor(R.color.pinkColor));
+                    TextView nowView = findViewById(v.getId());
+                    nowView.setBackgroundResource(R.drawable.active_schedule);
+                    nowView.setTextColor(getResources().getColor(R.color.backgroundMainColor));
                     sendGetScheduleParsingRequest("next");
                     setLoadingToList(ContainerName.SCHEDULE);
                     nextWeekScheduleCalled = true;
                 } else {
-                    onGetScheduleRequestCompleted("next");
+                    activeScheduleWeek = 1;
+                    TextView nextView = findViewById(R.id.now);
+                    nextView.setBackgroundResource(R.drawable.passive_schedule);
+                    nextView.setTextColor(getResources().getColor(R.color.pinkColor));
+                    TextView nowView = findViewById(v.getId());
+                    nowView.setBackgroundResource(R.drawable.active_schedule);
+                    nowView.setTextColor(getResources().getColor(R.color.backgroundMainColor));
+                    LinearLayout scheduleList = findViewById(R.id.scheduleList);
+                    scheduleList.removeAllViews();
+                    setLoadingToList(ContainerName.SCHEDULE);
+                    onGetScheduleRequestCompleted("next", "");
                 }
+            }
+        });
+
+        // ссылки с главной
+
+        RelativeLayout homeProfileLink = findViewById(R.id.homeProfileLink);
+        RelativeLayout homeScheduleLink = findViewById(R.id.homeScheduleLink);
+        RelativeLayout homeLessonsLink = findViewById(R.id.homeLessonsLink);
+        RelativeLayout homeNotificationLink = findViewById(R.id.homeNotificationLink);
+        RelativeLayout homeItogLink = findViewById(R.id.homeItogLink);
+        RelativeLayout homeAchivLink = findViewById(R.id.homeAchivLink);
+
+        homeProfileLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.PROFILE);
+            }
+        });
+        homeScheduleLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.SCHEDULE);
+            }
+        });
+        homeLessonsLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.LESSONS);
+            }
+        });
+        homeNotificationLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.NOTIFICATION);
+                sendGetVKWallPostsRequest(new String[] {"40"});
+                setLoadingToList(ContainerName.NOTIFICATION);
             }
         });
 
@@ -270,6 +449,7 @@ public class MainActivity extends AppCompatActivity {
         if (appFirstRun) {
 
             setContainer(ContainerName.LOGIN);
+
 
             // получаем данные для отправки запроса
 
@@ -348,6 +528,7 @@ public class MainActivity extends AppCompatActivity {
                     String day = new SimpleDateFormat("dd").format(date);
 
                     sendGetStudentStatsRequest();
+                    sendGetFinalMarksRequest();
                     sendGetStudentMainDataRequest(new String[]{ year, month });
                     sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
                 }
@@ -390,8 +571,8 @@ public class MainActivity extends AppCompatActivity {
         getStudentProfileDataRequestStatus    = RequestStatus.NOT_CALLED;
         getScheduleRequestStatus              = RequestStatus.NOT_CALLED;
         getStudentStatsRequestStatus          = RequestStatus.NOT_CALLED;
+        getFinalMarksRequestStatus            = RequestStatus.NOT_CALLED;
     }
-
 
     public void resetApp() {
 
@@ -459,6 +640,7 @@ public class MainActivity extends AppCompatActivity {
 
         System.out.println("---------");
         System.out.println("Stats request: " + getStudentStatsRequestStatus);
+        System.out.println("Final marks request: " + getFinalMarksRequestStatus);
         System.out.println("Main data request: " + getStudentMainDataRequestStatus);
         System.out.println("Student profile data request: " + getStudentProfileDataRequestStatus);
         System.out.println("Exercises by day request: " + getExercisesByDayRequestStatus);
@@ -467,6 +649,7 @@ public class MainActivity extends AppCompatActivity {
         if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
                 && getStudentMainDataRequestStatus == RequestStatus.COMPLETED
                 && getExercisesByDayRequestStatus  == RequestStatus.COMPLETED
+                && getFinalMarksRequestStatus      == RequestStatus.COMPLETED
         ) {
             preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
             preferencesEditor = preferences.edit();
@@ -488,6 +671,11 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendLoginRequest(String[] params) {
         setContainer(ContainerName.LOADING);
+//        loadingScreen.setBackgroundResource(R.drawable.anim_loading);
+//        AnimationDrawable anim = (AnimationDrawable) loadingScreen.getBackground();
+//        anim.setEnterFadeDuration(500);
+//        anim.setExitFadeDuration(500);
+//        anim.start();
         loginRequest request = new loginRequest();
         loginRequestStatus = RequestStatus.CALLED;
         request.execute(params);
@@ -535,6 +723,11 @@ public class MainActivity extends AppCompatActivity {
         request.execute();
     }
 
+    private void sendGetFinalMarksRequest() {
+        getFinalMarksRequest request = new getFinalMarksRequest();
+        getFinalMarksRequestStatus = RequestStatus.CALLED;
+        request.execute();
+    }
 
     // Колбеки, которые вызываются при завершении определенного запроса
 
@@ -578,6 +771,7 @@ public class MainActivity extends AppCompatActivity {
             String day = new SimpleDateFormat("dd").format(date);
 
             sendGetStudentStatsRequest();
+            sendGetFinalMarksRequest();
             sendGetStudentMainDataRequest(new String[]{ year, month });
             if (getStudentProfileDataRequestStatus != RequestStatus.COMPLETED) sendGetStudentProfileDataRequest();
             sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
@@ -832,7 +1026,8 @@ public class MainActivity extends AppCompatActivity {
                         String point = valueInfo.getString("point").toString().equals("null")  ? "нет" : valueInfo.getString("point");
                         if (point.equals("1")) point = "зачет";
                         String delay = valueInfo.getString("delay").toString().equals("null")  ? "нет" : "да";
-                        String performance = valueInfo.getString("performance").equals("null") ? "нет" : "да";
+                        String performance = valueInfo.getString("performance").equals("null") ? "нет" : "▲";
+                        if (valueInfo.getString("performance").equals("2")) performance = "▼";
 
 
 
@@ -1067,7 +1262,7 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    public void onGetScheduleRequestCompleted(String param) {
+    public void onGetScheduleRequestCompleted(String param, String filter) {
 
         LinearLayout box = findViewById(R.id.scheduleList);
         box.removeAllViews();
@@ -1099,150 +1294,355 @@ public class MainActivity extends AppCompatActivity {
                 e.printStackTrace();
             }
 
-            for (int i = 0; i < value.length(); i++) {
+            if (filter.equals("")) {
+                for (int i = 0; i < value.length(); i++) {
 
-                TextView dayOfWeekName = new TextView(getApplicationContext());
-                LinearLayout.LayoutParams dayOfWeekLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                dayOfWeekLP.setMargins(15*dp,0,0,3*dp);
-                dayOfWeekName.setLayoutParams(dayOfWeekLP);
-                dayOfWeekName.setTextSize(12);
-                dayOfWeekName.setTextColor(getResources().getColor(R.color.pinkColor));
-                dayOfWeekName.setTypeface(medium);
+                    TextView dayOfWeekName = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams dayOfWeekLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    dayOfWeekLP.setMargins(15 * dp, 0, 0, 3 * dp);
+                    dayOfWeekName.setLayoutParams(dayOfWeekLP);
+                    dayOfWeekName.setTextSize(12);
+                    dayOfWeekName.setTextColor(getResources().getColor(R.color.pinkColor));
+                    dayOfWeekName.setTypeface(medium);
 
-                switch (i) {
-                    case 0: {
-//                        text.setText(text.getText() + "Понедельник:\n\n");
-                        dayOfWeekName.setText("Понедельник");
-                        break;
+                    switch (i) {
+                        case 0: {
+                            //                        text.setText(text.getText() + "Понедельник:\n\n");
+                            dayOfWeekName.setText("Понедельник");
+                            break;
+                        }
+                        case 1: {
+                            //                        text.setText(text.getText() + "Вторник:\n\n");
+                            dayOfWeekName.setText("Вторник");
+                            break;
+                        }
+                        case 2: {
+                            //                        text.setText(text.getText() + "Среда:\n\n");
+                            dayOfWeekName.setText("Среда");
+                            break;
+                        }
+                        case 3: {
+                            //                        text.setText(text.getText() + "Четверг:\n\n");
+                            dayOfWeekName.setText("Четверг");
+                            break;
+                        }
+                        case 4: {
+                            //                        text.setText(text.getText() + "Пятница:\n\n");
+                            dayOfWeekName.setText("Пятница");
+                            break;
+                        }
+                        case 5: {
+                            //                        text.setText(text.getText() + "Суббота:\n\n");
+                            dayOfWeekName.setText("Суббота");
+                            break;
+                        }
                     }
-                    case 1: {
-//                        text.setText(text.getText() + "Вторник:\n\n");
-                        dayOfWeekName.setText("Вторник");
-                        break;
-                    }
-                    case 2: {
-//                        text.setText(text.getText() + "Среда:\n\n");
-                        dayOfWeekName.setText("Среда");
-                        break;
-                    }
-                    case 3: {
-//                        text.setText(text.getText() + "Четверг:\n\n");
-                        dayOfWeekName.setText("Четверг");
-                        break;
-                    }
-                    case 4: {
-//                        text.setText(text.getText() + "Пятница:\n\n");
-                        dayOfWeekName.setText("Пятница");
-                        break;
-                    }
-                    case 5: {
-//                        text.setText(text.getText() + "Суббота:\n\n");
-                        dayOfWeekName.setText("Суббота");
-                        break;
-                    }
-                }
 
-                box.addView(dayOfWeekName);
+                    box.addView(dayOfWeekName);
 
 
-                LinearLayout forLessonsOfTheDayBox = new LinearLayout(getApplicationContext());
-                LinearLayout.LayoutParams forLessonsOfTheDayBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                forLessonsOfTheDayBoxLP.setMargins(0,0,0,10*dp);
-                forLessonsOfTheDayBox.setLayoutParams(forLessonsOfTheDayBoxLP);
-                forLessonsOfTheDayBox.setBackgroundResource(R.drawable.forms_example);
-                forLessonsOfTheDayBox.setPadding(0,0,0,5*dp);
-                forLessonsOfTheDayBox.setOrientation(LinearLayout.VERTICAL);
-                box.addView(forLessonsOfTheDayBox);
+                    LinearLayout forLessonsOfTheDayBox = new LinearLayout(getApplicationContext());
+                    LinearLayout.LayoutParams forLessonsOfTheDayBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    forLessonsOfTheDayBoxLP.setMargins(0, 0, 0, 10 * dp);
+                    forLessonsOfTheDayBox.setLayoutParams(forLessonsOfTheDayBoxLP);
+                    forLessonsOfTheDayBox.setBackgroundResource(R.drawable.forms_example);
+                    forLessonsOfTheDayBox.setPadding(0, 0, 0, 5 * dp);
+                    forLessonsOfTheDayBox.setOrientation(LinearLayout.VERTICAL);
+                    box.addView(forLessonsOfTheDayBox);
 
-                JSONArray temp = new JSONArray();
-                try {
-                    temp = value.getJSONArray(i);
-                } catch (JSONException e) {
-                    e.printStackTrace();
-                }
-
-                for (int j = 0; j < temp.length(); j++) {
-
-                    JSONObject tmp = new JSONObject();
+                    JSONArray temp = new JSONArray();
                     try {
-                        tmp = temp.getJSONObject(j);
+                        temp = value.getJSONArray(i);
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
+                    for (int j = 0; j < temp.length(); j++) {
 
+                        JSONObject tmp = new JSONObject();
+                        try {
+                            tmp = temp.getJSONObject(j);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+                        try {
+                            //                        text.setText(text.getText() + tmp.getString("position") + " (" + tmp.getString("start") + tmp.getString("end") + ") " + tmp.getString("name") + " (" + tmp.getString("teacher") + ")\n");
+
+                            LinearLayout aboutLessonsOfTheDayBox = new LinearLayout(getApplicationContext());
+                            LinearLayout.LayoutParams aboutLessonsOfTheDayBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            aboutLessonsOfTheDayBoxLP.setMargins(0, 5 * dp, 0, 5 * dp);
+                            aboutLessonsOfTheDayBox.setLayoutParams(aboutLessonsOfTheDayBoxLP);
+                            aboutLessonsOfTheDayBox.setBackgroundResource(R.drawable.forms_example);
+                            aboutLessonsOfTheDayBox.setOrientation(LinearLayout.VERTICAL);
+                            forLessonsOfTheDayBox.addView(aboutLessonsOfTheDayBox);
+
+                            String pos = "";
+
+                            switch (tmp.getString("position")) {
+                                case "I": {
+                                    pos = "1";
+                                    break;
+                                }
+                                case "II": {
+                                    pos = "2";
+                                    break;
+                                }
+                                case "III": {
+                                    pos = "3";
+                                    break;
+                                }
+                                case "IV": {
+                                    pos = "4";
+                                    break;
+                                }
+                                case "V": {
+                                    pos = "5";
+                                    break;
+                                }
+                                case "VI": {
+                                    pos = "6";
+                                    break;
+                                }
+                            }
+
+                            TextView theDayLessonsCounter = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsCounterLP = new LinearLayout.LayoutParams(20 * dp, 20 * dp);
+                            theDayLessonsCounterLP.setMargins(12 * dp, 10 * dp, 0, 0);
+                            theDayLessonsCounter.setLayoutParams(theDayLessonsCounterLP);
+                            theDayLessonsCounter.setBackgroundResource(R.drawable.lesson_number);
+                            theDayLessonsCounter.setText(pos);
+                            theDayLessonsCounter.setTypeface(light);
+                            theDayLessonsCounter.setTextColor(getResources().getColor(R.color.white));
+                            theDayLessonsCounter.setGravity(Gravity.CENTER);
+                            theDayLessonsCounter.setTextSize(14);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsCounter);
+                            //
+                            //
+                            TextView theDayLessonsCab = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsCabLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 20 * dp);
+                            theDayLessonsCabLP.setMargins(0, -20 * dp, 12 * dp, 0);
+                            theDayLessonsCab.setLayoutParams(theDayLessonsCabLP);
+                            theDayLessonsCab.setText(tmp.getString("room"));
+                            theDayLessonsCab.setTypeface(medium);
+                            theDayLessonsCab.setTextColor(getResources().getColor(R.color.white));
+                            theDayLessonsCab.setGravity(Gravity.RIGHT);
+                            theDayLessonsCab.setTextSize(12);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsCab);
+
+                            TextView theDayLessonsTime = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsTimeLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 20 * dp);
+                            theDayLessonsTimeLP.setMargins(40 * dp, -21 * dp, 0, 0);
+                            theDayLessonsTime.setLayoutParams(theDayLessonsTimeLP);
+                            theDayLessonsTime.setText(tmp.getString("start") + " - " + tmp.getString("end"));
+                            theDayLessonsTime.setTypeface(light);
+                            theDayLessonsTime.setTextColor(getResources().getColor(R.color.greyColor));
+                            theDayLessonsTime.setGravity(Gravity.CENTER_VERTICAL);
+                            theDayLessonsTime.setTextSize(12);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsTime);
+
+                            TextView theDayLessonsNameOfLesson = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsNameOfLessonLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            theDayLessonsNameOfLessonLP.setMargins(40 * dp, 5 * dp, 40 * dp, 0);
+                            theDayLessonsNameOfLesson.setLayoutParams(theDayLessonsNameOfLessonLP);
+                            theDayLessonsNameOfLesson.setText(tmp.getString("name"));
+                            theDayLessonsNameOfLesson.setTypeface(medium);
+                            theDayLessonsNameOfLesson.setTextColor(getResources().getColor(R.color.white));
+                            theDayLessonsNameOfLesson.setGravity(Gravity.CENTER_VERTICAL);
+                            theDayLessonsNameOfLesson.setTextSize(13);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsNameOfLesson);
+
+                            TextView theDayLessonsTeacher = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsTeacherLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            theDayLessonsTeacherLP.setMargins(40 * dp, 0, 40 * dp, 5 * dp);
+                            theDayLessonsTeacher.setLayoutParams(theDayLessonsTeacherLP);
+                            theDayLessonsTeacher.setText(tmp.getString("teacher"));
+                            theDayLessonsTeacher.setTypeface(light);
+                            theDayLessonsTeacher.setTextColor(getResources().getColor(R.color.greyColor));
+                            theDayLessonsTeacher.setGravity(Gravity.CENTER_VERTICAL);
+                            theDayLessonsTeacher.setTextSize(12);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsTeacher);
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        //                    text.setText(text.getText() + "\n\n");
+
+                    }
+                }
+            } else {
+                for (int i = Integer.parseInt(filter); i < Integer.parseInt(filter)+1; i++) {
+
+                    TextView dayOfWeekName = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams dayOfWeekLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    dayOfWeekLP.setMargins(15 * dp, 0, 0, 3 * dp);
+                    dayOfWeekName.setLayoutParams(dayOfWeekLP);
+                    dayOfWeekName.setTextSize(12);
+                    dayOfWeekName.setTextColor(getResources().getColor(R.color.pinkColor));
+                    dayOfWeekName.setTypeface(medium);
+
+                    switch (i) {
+                        case 0: {
+                            //                        text.setText(text.getText() + "Понедельник:\n\n");
+                            dayOfWeekName.setText("Понедельник");
+                            break;
+                        }
+                        case 1: {
+                            //                        text.setText(text.getText() + "Вторник:\n\n");
+                            dayOfWeekName.setText("Вторник");
+                            break;
+                        }
+                        case 2: {
+                            //                        text.setText(text.getText() + "Среда:\n\n");
+                            dayOfWeekName.setText("Среда");
+                            break;
+                        }
+                        case 3: {
+                            //                        text.setText(text.getText() + "Четверг:\n\n");
+                            dayOfWeekName.setText("Четверг");
+                            break;
+                        }
+                        case 4: {
+                            //                        text.setText(text.getText() + "Пятница:\n\n");
+                            dayOfWeekName.setText("Пятница");
+                            break;
+                        }
+                        case 5: {
+                            //                        text.setText(text.getText() + "Суббота:\n\n");
+                            dayOfWeekName.setText("Суббота");
+                            break;
+                        }
+                    }
+
+                    box.addView(dayOfWeekName);
+
+
+                    LinearLayout forLessonsOfTheDayBox = new LinearLayout(getApplicationContext());
+                    LinearLayout.LayoutParams forLessonsOfTheDayBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    forLessonsOfTheDayBoxLP.setMargins(0, 0, 0, 10 * dp);
+                    forLessonsOfTheDayBox.setLayoutParams(forLessonsOfTheDayBoxLP);
+                    forLessonsOfTheDayBox.setBackgroundResource(R.drawable.forms_example);
+                    forLessonsOfTheDayBox.setPadding(0, 0, 0, 5 * dp);
+                    forLessonsOfTheDayBox.setOrientation(LinearLayout.VERTICAL);
+                    box.addView(forLessonsOfTheDayBox);
+
+                    JSONArray temp = new JSONArray();
                     try {
-//                        text.setText(text.getText() + tmp.getString("position") + " (" + tmp.getString("start") + tmp.getString("end") + ") " + tmp.getString("name") + " (" + tmp.getString("teacher") + ")\n");
-
-                        RelativeLayout aboutLessonsOfTheDayBox = new RelativeLayout(getApplicationContext());
-                        RelativeLayout.LayoutParams  aboutLessonsOfTheDayBoxLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                        aboutLessonsOfTheDayBoxLP.setMargins(0,5*dp,0,5*dp);
-                        aboutLessonsOfTheDayBox.setLayoutParams(aboutLessonsOfTheDayBoxLP);
-                        aboutLessonsOfTheDayBox.setBackgroundResource(R.drawable.forms_example);
-                        forLessonsOfTheDayBox.addView(aboutLessonsOfTheDayBox);
-
-                        TextView theDayLessonsCounter = new TextView(getApplicationContext());
-                        RelativeLayout.LayoutParams theDayLessonsCounterLP = new RelativeLayout.LayoutParams(20*dp, 20*dp);
-                        theDayLessonsCounterLP.setMargins(7*dp,10*dp,0,0);
-                        theDayLessonsCounter.setLayoutParams(theDayLessonsCounterLP);
-                        theDayLessonsCounter.setBackgroundResource(R.drawable.lesson_number);
-                        theDayLessonsCounter.setText(tmp.getString("position"));
-                        theDayLessonsCounter.setTypeface(light);
-                        theDayLessonsCounter.setTextColor(getResources().getColor(R.color.white));
-                        theDayLessonsCounter.setGravity(Gravity.CENTER);
-                        theDayLessonsCounter.setTextSize(14);
-                        aboutLessonsOfTheDayBox.addView(theDayLessonsCounter);
-
-
-                        TextView theDayLessonsCab = new TextView(getApplicationContext());
-                        RelativeLayout.LayoutParams theDayLessonsCabLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, 20*dp);
-                        theDayLessonsCabLP.setMargins(0,10*dp,10*dp,0);
-                        theDayLessonsCabLP.addRule(RelativeLayout.ALIGN_PARENT_RIGHT);
-                        theDayLessonsCab.setLayoutParams(theDayLessonsCabLP);
-                        theDayLessonsCab.setText("310");
-                        theDayLessonsCab.setTypeface(medium);
-                        theDayLessonsCab.setTextColor(getResources().getColor(R.color.white));
-                        theDayLessonsCab.setGravity(Gravity.CENTER_VERTICAL);
-                        theDayLessonsCab.setTextSize(12);
-                        aboutLessonsOfTheDayBox.addView(theDayLessonsCab);
-
-                        TextView theDayLessonsTime = new TextView(getApplicationContext());
-                        RelativeLayout.LayoutParams theDayLessonsTimeLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, 20*dp);
-                        theDayLessonsTimeLP.setMargins(35*dp,10*dp,0,0);
-                        theDayLessonsTime.setLayoutParams(theDayLessonsTimeLP);
-                        theDayLessonsTime.setText(tmp.getString("start") + " - " + tmp.getString("end"));
-                        theDayLessonsTime.setTypeface(light);
-                        theDayLessonsTime.setTextColor(getResources().getColor(R.color.greyColor));
-                        theDayLessonsTime.setGravity(Gravity.CENTER_VERTICAL);
-                        theDayLessonsTime.setTextSize(12);
-                        aboutLessonsOfTheDayBox.addView(theDayLessonsTime);
-
-                        TextView theDayLessonsNameOfLesson = new TextView(getApplicationContext());
-                        RelativeLayout.LayoutParams theDayLessonsNameOfLessonLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                        theDayLessonsNameOfLessonLP.setMargins(35*dp,30*dp,0,0);
-                        theDayLessonsNameOfLesson.setLayoutParams(theDayLessonsNameOfLessonLP);
-                        theDayLessonsNameOfLesson.setText(tmp.getString("name"));
-                        theDayLessonsNameOfLesson.setTypeface(medium);
-                        theDayLessonsNameOfLesson.setTextColor(getResources().getColor(R.color.white));
-                        theDayLessonsNameOfLesson.setGravity(Gravity.CENTER_VERTICAL);
-                        theDayLessonsNameOfLesson.setTextSize(13);
-                        aboutLessonsOfTheDayBox.addView(theDayLessonsNameOfLesson);
-
-                        TextView theDayLessonsTeacher = new TextView(getApplicationContext());
-                        RelativeLayout.LayoutParams theDayLessonsTeacherLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                        theDayLessonsTeacherLP.setMargins(35*dp,45*dp,0,5*dp);
-                        theDayLessonsTeacher.setLayoutParams(theDayLessonsTeacherLP);
-                        theDayLessonsTeacher.setText(tmp.getString("teacher"));
-                        theDayLessonsTeacher.setTypeface(light);
-                        theDayLessonsTeacher.setTextColor(getResources().getColor(R.color.greyColor));
-                        theDayLessonsTeacher.setGravity(Gravity.CENTER_VERTICAL);
-                        theDayLessonsTeacher.setTextSize(12);
-                        aboutLessonsOfTheDayBox.addView(theDayLessonsTeacher);
-
+                        temp = value.getJSONArray(i);
                     } catch (JSONException e) {
                         e.printStackTrace();
                     }
-//                    text.setText(text.getText() + "\n\n");
+                    for (int j = 0; j < temp.length(); j++) {
 
+                        JSONObject tmp = new JSONObject();
+                        try {
+                            tmp = temp.getJSONObject(j);
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+
+                        try {
+                            //                        text.setText(text.getText() + tmp.getString("position") + " (" + tmp.getString("start") + tmp.getString("end") + ") " + tmp.getString("name") + " (" + tmp.getString("teacher") + ")\n");
+
+                            LinearLayout aboutLessonsOfTheDayBox = new LinearLayout(getApplicationContext());
+                            LinearLayout.LayoutParams aboutLessonsOfTheDayBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            aboutLessonsOfTheDayBoxLP.setMargins(0, 5 * dp, 0, 5 * dp);
+                            aboutLessonsOfTheDayBox.setLayoutParams(aboutLessonsOfTheDayBoxLP);
+                            aboutLessonsOfTheDayBox.setBackgroundResource(R.drawable.forms_example);
+                            aboutLessonsOfTheDayBox.setOrientation(LinearLayout.VERTICAL);
+                            forLessonsOfTheDayBox.addView(aboutLessonsOfTheDayBox);
+
+                            String pos = "";
+
+                            switch (tmp.getString("position")) {
+                                case "I": {
+                                    pos = "1";
+                                    break;
+                                }
+                                case "II": {
+                                    pos = "2";
+                                    break;
+                                }
+                                case "III": {
+                                    pos = "3";
+                                    break;
+                                }
+                                case "IV": {
+                                    pos = "4";
+                                    break;
+                                }
+                                case "V": {
+                                    pos = "5";
+                                    break;
+                                }
+                                case "VI": {
+                                    pos = "6";
+                                    break;
+                                }
+                            }
+
+                            TextView theDayLessonsCounter = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsCounterLP = new LinearLayout.LayoutParams(20 * dp, 20 * dp);
+                            theDayLessonsCounterLP.setMargins(12 * dp, 10 * dp, 0, 0);
+                            theDayLessonsCounter.setLayoutParams(theDayLessonsCounterLP);
+                            theDayLessonsCounter.setBackgroundResource(R.drawable.lesson_number);
+                            theDayLessonsCounter.setText(pos);
+                            theDayLessonsCounter.setTypeface(light);
+                            theDayLessonsCounter.setTextColor(getResources().getColor(R.color.white));
+                            theDayLessonsCounter.setGravity(Gravity.CENTER);
+                            theDayLessonsCounter.setTextSize(14);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsCounter);
+                            //
+                            //
+                            TextView theDayLessonsCab = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsCabLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, 20 * dp);
+                            theDayLessonsCabLP.setMargins(0, -20 * dp, 12 * dp, 0);
+                            theDayLessonsCab.setLayoutParams(theDayLessonsCabLP);
+                            theDayLessonsCab.setText(tmp.getString("room"));
+                            theDayLessonsCab.setTypeface(medium);
+                            theDayLessonsCab.setTextColor(getResources().getColor(R.color.white));
+                            theDayLessonsCab.setGravity(Gravity.RIGHT);
+                            theDayLessonsCab.setTextSize(12);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsCab);
+
+                            TextView theDayLessonsTime = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsTimeLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 20 * dp);
+                            theDayLessonsTimeLP.setMargins(40 * dp, -21 * dp, 0, 0);
+                            theDayLessonsTime.setLayoutParams(theDayLessonsTimeLP);
+                            theDayLessonsTime.setText(tmp.getString("start") + " - " + tmp.getString("end"));
+                            theDayLessonsTime.setTypeface(light);
+                            theDayLessonsTime.setTextColor(getResources().getColor(R.color.greyColor));
+                            theDayLessonsTime.setGravity(Gravity.CENTER_VERTICAL);
+                            theDayLessonsTime.setTextSize(12);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsTime);
+
+                            TextView theDayLessonsNameOfLesson = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsNameOfLessonLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            theDayLessonsNameOfLessonLP.setMargins(40 * dp, 5 * dp, 40 * dp, 0);
+                            theDayLessonsNameOfLesson.setLayoutParams(theDayLessonsNameOfLessonLP);
+                            theDayLessonsNameOfLesson.setText(tmp.getString("name"));
+                            theDayLessonsNameOfLesson.setTypeface(medium);
+                            theDayLessonsNameOfLesson.setTextColor(getResources().getColor(R.color.white));
+                            theDayLessonsNameOfLesson.setGravity(Gravity.CENTER_VERTICAL);
+                            theDayLessonsNameOfLesson.setTextSize(13);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsNameOfLesson);
+
+                            TextView theDayLessonsTeacher = new TextView(getApplicationContext());
+                            LinearLayout.LayoutParams theDayLessonsTeacherLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                            theDayLessonsTeacherLP.setMargins(40 * dp, 0, 40 * dp, 5 * dp);
+                            theDayLessonsTeacher.setLayoutParams(theDayLessonsTeacherLP);
+                            theDayLessonsTeacher.setText(tmp.getString("teacher"));
+                            theDayLessonsTeacher.setTypeface(light);
+                            theDayLessonsTeacher.setTextColor(getResources().getColor(R.color.greyColor));
+                            theDayLessonsTeacher.setGravity(Gravity.CENTER_VERTICAL);
+                            theDayLessonsTeacher.setTextSize(12);
+                            aboutLessonsOfTheDayBox.addView(theDayLessonsTeacher);
+
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        //                    text.setText(text.getText() + "\n\n");
+
+                    }
                 }
             }
         } else {
@@ -1276,6 +1676,21 @@ public class MainActivity extends AppCompatActivity {
         } else {
             getStudentStatsRequestStatus = RequestStatus.EMPTY_RESPONSE;
             System.out.println("Student stats request empty response!");
+        }
+    }
+
+    public void onGetFinalMarksRequestCompleted() {
+        if (getFinalMarksRequestStatus == RequestStatus.CALLED) {
+            getFinalMarksRequestStatus = RequestStatus.COMPLETED;
+        }
+        else if (getFinalMarksRequestStatus == RequestStatus.FAILED) {
+
+        }
+        else if (getFinalMarksRequestStatus == RequestStatus.TIMEOUT) {
+
+        }
+        else {
+
         }
     }
 
@@ -1734,7 +2149,7 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
             getScheduleRequestStatus = RequestStatus.COMPLETED;
-            onGetScheduleRequestCompleted(result);
+            onGetScheduleRequestCompleted(result, "");
         }
     }
 
@@ -1797,6 +2212,90 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    class getFinalMarksRequest extends AsyncTask<Void, Void, Void> {
+
+        protected Void doInBackground(Void... params) {
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+            Document html = new Document(responseBody);
+
+            try {
+                String url_address = "https://ifspo.ifmo.ru/profile/statistic?user=" + studentId;
+
+                urlConnection = Functions.setupGETAuthRequest(url_address, authCookie, FINAL_MARKS_REQUEST_CONNECT_TIMEOUT, FINAL_MARKS_REQUEST_READ_TIMEOUT);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+
+                html = Jsoup.parse(responseBody);
+
+                Element container = html.body()
+                        .getElementsByClass("container").get(0)
+                        .getElementsByClass("row").get(1)
+                        .getElementsByClass("span12").get(1)
+                        .getElementsByTag("table").get(0)
+                        .getElementsByTag("tbody").get(0);
+
+//                System.out.println(container.toString());
+
+                String lesson;
+                String count;
+                String visits;
+                String absences;
+                String certification;
+                String finalMark;
+
+                JSONArray array = new JSONArray();
+
+                for (Element tr : container.getElementsByTag("tr")) {
+                    Elements tds = tr.getElementsByTag("td");
+
+                    lesson          = tds.get(0).text();
+                    count           = tds.get(1).text();
+                    visits          = tds.get(2).text();
+                    absences        = tds.get(3).text();
+                    certification   = tds.get(4).text();
+                    finalMark       = tds.get(5).text();
+
+                    JSONObject temp = new JSONObject();
+                    temp.put("name", lesson);
+                    temp.put("all", count);
+                    temp.put("was", visits);
+                    temp.put("absences", absences);
+                    temp.put("certification", certification);
+                    temp.put("mark", finalMark);
+
+                    array.put(temp);
+                }
+
+//                System.out.println(array);
+
+                studentFinalMarks = array;
+
+            } catch (SocketTimeoutException e) {
+                System.out.println("Final marks request timeout!");
+                getFinalMarksRequestStatus = RequestStatus.TIMEOUT;
+//                return;
+            } catch (Exception e) {
+                System.out.println("Problems with final marks request");
+                System.out.println(e.toString());
+                getFinalMarksRequestStatus = RequestStatus.FAILED;
+//                return;
+            } finally {
+                if (urlConnection != null) urlConnection.disconnect();
+            }
+
+//            return;
+//            System.out.println("GetProfileParsing Success!");
+
+            return null;
+        }
+
+        protected void onPostExecute(Void result) {
+            super.onPostExecute(result);
+            onGetFinalMarksRequestCompleted();
+
+        }
+    }
+
 
 
 
@@ -1815,13 +2314,13 @@ public class MainActivity extends AppCompatActivity {
 
     // кнопки нужны глобально
 
-    ImageView home;
-    ImageView schedule;
-    ImageView profile;
-    ImageView lessons;
-    ImageView exit;
+    LinearLayout home;
+    LinearLayout schedule;
+    LinearLayout profile;
+    LinearLayout lessons;
+    LinearLayout settings;
 
-    ImageView userHelp;
+    LinearLayout userHelp;
     TextView scheduleNow;
     TextView scheduleNext;
 
@@ -1835,6 +2334,21 @@ public class MainActivity extends AppCompatActivity {
     TextView profileUserBills;
     LinearLayout todayLessonsView;
 
+    // Все для анимации навигации
+
+    ImageView homeNavImg;
+    TextView homeNavText;
+    ImageView scheduleNavImg;
+    TextView scheduleNavText;
+    ImageView profileNavImg;
+    TextView profileNavText;
+    ImageView lessonsNavImg;
+    TextView lessonsNavText;
+    ImageView settingsNavImg;
+    TextView settingsNavText;
+    ImageView notificationNavImg;
+    TextView notificationNavText;
+
 
 
     // переменная для мониторинга активного контейнера
@@ -1844,28 +2358,47 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void setContainer(ContainerName newContainer) { // функция обновления активного контейнера
+
         switch (activeContainer) {
             case PROFILE: {
+                profileNavImg.setImageResource(R.drawable.profile);
+                profileNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                profileNavText.setShadowLayer(0,0,0,0);
                 main.removeView(profileScreen);
                 break;
             }
             case HOME: {
+                homeNavImg.setImageResource(R.drawable.main);
+                homeNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                homeNavText.setShadowLayer(0,0,0,0);
                 main.removeView(homeScreen);
                 break;
             }
             case SCHEDULE: {
+                scheduleNavImg.setImageResource(R.drawable.schedule);
+                scheduleNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                scheduleNavText.setShadowLayer(0,0,0,0);
                 main.removeView(scheduleScreen);
                 break;
             }
             case LESSONS: {
+                lessonsNavImg.setImageResource(R.drawable.subject);
+                lessonsNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                lessonsNavText.setShadowLayer(0,0,0,0);
                 main.removeView(lessonsScreen);
                 break;
             }
             case LESSONS_INFORMATION: {
+                lessonsNavImg.setImageResource(R.drawable.subject);
+                lessonsNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                lessonsNavText.setShadowLayer(0,0,0,0);
                 main.removeView(lessonsInformationScreen);
                 break;
             }
             case NOTIFICATION: {
+                notificationNavImg.setImageResource(R.drawable.bell);
+                notificationNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                notificationNavText.setShadowLayer(0,0,0,0);
                 main.removeView(notificationListScreen);
                 break;
             }
@@ -1880,31 +2413,54 @@ public class MainActivity extends AppCompatActivity {
 
         switch (newContainer) {
             case PROFILE: {
+                profileNavImg.setImageResource(R.drawable.profile_active);
+                profileNavText.setTextColor(getResources().getColor(R.color.white));
+                profileNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(profileScreen);
                 activeContainer = ContainerName.PROFILE;
                 break;
             }
             case HOME: {
+                homeNavImg.setImageResource(R.drawable.main_active);
+                homeNavText.setTextColor(getResources().getColor(R.color.white));
+                homeNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(homeScreen);
                 activeContainer = ContainerName.HOME;
                 break;
             }
             case SCHEDULE: {
+                scheduleNavImg.setImageResource(R.drawable.schedule_active);
+                scheduleNavText.setTextColor(getResources().getColor(R.color.white));
+                scheduleNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(scheduleScreen);
                 activeContainer = ContainerName.SCHEDULE;
+                if (!nowWeekScheduleCalled) {
+                    sendGetScheduleParsingRequest("now");
+                    setLoadingToList(ContainerName.SCHEDULE);
+                    nowWeekScheduleCalled = true;
+                }
                 break;
             }
             case LESSONS: {
+                lessonsNavImg.setImageResource(R.drawable.subject_active);
+                lessonsNavText.setTextColor(getResources().getColor(R.color.white));
+                lessonsNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(lessonsScreen);
                 activeContainer = ContainerName.LESSONS;
                 break;
             }
             case LESSONS_INFORMATION: {
+                lessonsNavImg.setImageResource(R.drawable.subject_active);
+                lessonsNavText.setTextColor(getResources().getColor(R.color.white));
+                lessonsNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(lessonsInformationScreen);
                 activeContainer = ContainerName.LESSONS_INFORMATION;
                 break;
             }
             case NOTIFICATION: {
+                notificationNavImg.setImageResource(R.drawable.bell_active);
+                notificationNavText.setTextColor(getResources().getColor(R.color.white));
+                notificationNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(notificationListScreen);
                 activeContainer = ContainerName.NOTIFICATION;
                 break;
@@ -1923,6 +2479,7 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void setLoadingToList(ContainerName neededContainer) { // функция обновления активного контейнера
+
         switch (neededContainer) {
             case SCHEDULE: {
                 LinearLayout box = findViewById(R.id.scheduleList);
@@ -2078,7 +2635,7 @@ public class MainActivity extends AppCompatActivity {
         schedule = findViewById(R.id.schedule);
         profile = findViewById(R.id.profile);
         lessons = findViewById(R.id.lessons);
-        exit = findViewById(R.id.exit);
+        settings = findViewById(R.id.settings);
         userHelp = findViewById(R.id.notification);
 
 
@@ -2093,7 +2650,7 @@ public class MainActivity extends AppCompatActivity {
         schedule.setOnClickListener(wasClicked);
         profile.setOnClickListener(wasClicked);
         lessons.setOnClickListener(wasClicked);
-        exit.setOnClickListener(wasClicked);
+        settings.setOnClickListener(wasClicked);
 
 //        scheduleChanges.setOnClickListener(wasClicked);
 
@@ -2117,14 +2674,16 @@ public class MainActivity extends AppCompatActivity {
             try {
                 value = exercisesByDay.getJSONObject(i);
 
-                RelativeLayout mainTodayLessonsTmpBox = new RelativeLayout(getApplicationContext());
-                RelativeLayout.LayoutParams mainTodayLessonsTmpBoxLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                LinearLayout mainTodayLessonsTmpBox = new LinearLayout(getApplicationContext());
+                LinearLayout.LayoutParams mainTodayLessonsTmpBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
                 mainTodayLessonsTmpBox.setLayoutParams(mainTodayLessonsTmpBoxLP);
-                mainTodayLessonsTmpBoxLP.setMargins((int)dp*5,(int) dp*15, (int)dp*10,(int) dp*10);
+                mainTodayLessonsTmpBoxLP.setMargins(0,dp*15, 0,7*dp);
+                mainTodayLessonsTmpBox.setOrientation(LinearLayout.VERTICAL);
                 todayLessonsView.addView(mainTodayLessonsTmpBox);
 
                 TextView todayLessonTmpBoxNumber = new TextView(getApplicationContext());
-                RelativeLayout.LayoutParams todayLessonTmpBoxNumberLP = new RelativeLayout.LayoutParams((int)dp*20, (int)dp*20);
+                LinearLayout.LayoutParams todayLessonTmpBoxNumberLP = new LinearLayout.LayoutParams((int)dp*20, (int)dp*20);
+                todayLessonTmpBoxNumberLP.setMargins(12*dp,0,0,0);
                 todayLessonTmpBoxNumber.setLayoutParams(todayLessonTmpBoxNumberLP);
                 todayLessonTmpBoxNumber.setBackgroundResource(R.drawable.lesson_number);
                 todayLessonTmpBoxNumber.setText(value.getString("time"));
@@ -2166,8 +2725,8 @@ public class MainActivity extends AppCompatActivity {
                 }
 
                 TextView todayLessonTmpBoxTime = new TextView(getApplicationContext());
-                RelativeLayout.LayoutParams todayLessonTmpBoxTimeLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, 20*dp);
-                todayLessonTmpBoxTimeLP.setMargins(30*dp, -1*dp, 0, 0);
+                LinearLayout.LayoutParams todayLessonTmpBoxTimeLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, 20*dp);
+                todayLessonTmpBoxTimeLP.setMargins(40*dp, -21*dp, 0, 0);
                 todayLessonTmpBoxTime.setLayoutParams(todayLessonTmpBoxTimeLP);
                 todayLessonTmpBoxTime.setText(todayLessonDuration);
                 todayLessonTmpBoxTime.setTextSize(12);
@@ -2178,8 +2737,8 @@ public class MainActivity extends AppCompatActivity {
 
 
                 TextView todayLessonTmpBoxName = new TextView(getApplicationContext());
-                RelativeLayout.LayoutParams todayLessonTmpBoxNameLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                todayLessonTmpBoxNameLP.setMargins(30*dp, 20*dp, 0, 0);
+                LinearLayout.LayoutParams todayLessonTmpBoxNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                todayLessonTmpBoxNameLP.setMargins(40*dp, 5*dp, 40*dp, 0);
                 todayLessonTmpBoxName.setLayoutParams(todayLessonTmpBoxNameLP);
                 todayLessonTmpBoxName.setText(value.getString("name"));
                 todayLessonTmpBoxName.setTextSize(13);
@@ -2189,8 +2748,8 @@ public class MainActivity extends AppCompatActivity {
                 mainTodayLessonsTmpBox.addView(todayLessonTmpBoxName);
 
                 TextView todayLessonTmpBoxPrepod = new TextView(getApplicationContext());
-                RelativeLayout.LayoutParams todayLessonTmpBoxPrepodLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.WRAP_CONTENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                todayLessonTmpBoxPrepodLP.setMargins(30*dp, 35*dp, 0, 0);
+                LinearLayout.LayoutParams todayLessonTmpBoxPrepodLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                todayLessonTmpBoxPrepodLP.setMargins(40*dp, 0, 40*dp, 0);
                 todayLessonTmpBoxPrepod.setLayoutParams(todayLessonTmpBoxPrepodLP);
                 JSONObject teacher = teachers.getJSONObject(value.getString("lid"));
                 todayLessonTmpBoxPrepod.setText(teacher.getString("lastname") + " " + teacher.getString("firstname") + " " + teacher.getString("middlename"));
@@ -2202,7 +2761,7 @@ public class MainActivity extends AppCompatActivity {
 
                 LinearLayout todayLessonsForUserInformationBox = new LinearLayout(getApplicationContext());
                 LinearLayout.LayoutParams todayLessonsForUserInformationBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                todayLessonsForUserInformationBoxLP.setMargins(5*dp, 55*dp, 5*dp, 0);
+                todayLessonsForUserInformationBoxLP.setMargins(5*dp, 5*dp, 5*dp, 0);
                 todayLessonsForUserInformationBox.setLayoutParams(todayLessonsForUserInformationBoxLP);
                 mainTodayLessonsTmpBox.addView(todayLessonsForUserInformationBox);
 
@@ -2254,7 +2813,7 @@ public class MainActivity extends AppCompatActivity {
 
                 LinearLayout todayLessonsAboutUserInformationBox = new LinearLayout(getApplicationContext());
                 LinearLayout.LayoutParams todayLessonsAboutUserInformationBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
-                todayLessonsAboutUserInformationBoxLP.setMargins(5*dp,68*dp,5*dp,0);
+                todayLessonsAboutUserInformationBoxLP.setMargins(5*dp,0,5*dp,0);
                 todayLessonsAboutUserInformationBox.setLayoutParams(todayLessonsAboutUserInformationBoxLP);
                 mainTodayLessonsTmpBox.addView(todayLessonsAboutUserInformationBox);
 
@@ -2270,7 +2829,8 @@ public class MainActivity extends AppCompatActivity {
                     String point = valueInfo.getString("point").toString().equals("null")  ? "нет" : valueInfo.getString("point");
                     if (point.equals("1")) point = "зачет";
                     String delay = valueInfo.getString("delay").toString().equals("null")  ? "нет" : "да";
-                    String performance = valueInfo.getString("performance").equals("null") ? "нет" : "да";
+                    String performance = valueInfo.getString("performance").equals("null") ? "нет" : "▲";
+                    if (valueInfo.getString("performance").equals("2")) performance = "▼";
 
 
 
@@ -2401,7 +2961,7 @@ public class MainActivity extends AppCompatActivity {
                 setContainer(ContainerName.NOTIFICATION);
             }
 
-            if (v.getId() == exit.getId()) {
+            if (v.getId() == settings.getId()) {
                 resetApp();
                 setLoginFormContainer();
             }
@@ -2423,6 +2983,266 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+
+
+
+    class scheduleDaysClickListener implements View.OnClickListener {
+        @Override
+        public void onClick(View v)
+        {
+            if (v.getId() == monday.getId()) {
+                if (!mondayIsActive) {
+                    mondayIsActive = true;
+
+                    if (tuesdayIsActive) {
+                        tuesdayIsActive = false;
+                        tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (wednesdayIsActive) {
+                        wednesdayIsActive = false;
+                        wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (thursdayIsActive) {
+                        thursdayIsActive = false;
+                        thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (fridayIsActive) {
+                        fridayIsActive = false;
+                        friday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (saturdayIsActive) {
+                        saturdayIsActive = false;
+                        saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+
+                    monday.setTextColor(getResources().getColor(R.color.pinkColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "0");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "0");
+                    }
+                } else {
+                    mondayIsActive = false;
+                    monday.setTextColor(getResources().getColor(R.color.greyColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "");
+                    }
+                }
+            }
+
+            if (v.getId() == tuesday.getId()) {
+                if (!tuesdayIsActive) {
+                    tuesdayIsActive = true;
+
+                    if (mondayIsActive) {
+                        mondayIsActive = false;
+                        monday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (wednesdayIsActive) {
+                        wednesdayIsActive = false;
+                        wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (thursdayIsActive) {
+                        thursdayIsActive = false;
+                        thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (fridayIsActive) {
+                        fridayIsActive = false;
+                        friday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (saturdayIsActive) {
+                        saturdayIsActive = false;
+                        saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+
+                    tuesday.setTextColor(getResources().getColor(R.color.pinkColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "1");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "1");
+                    }
+                } else {
+                    tuesdayIsActive = false;
+                    tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "");
+                    }
+                }
+            }
+
+            if (v.getId() == wednesday.getId()) {
+                if (!wednesdayIsActive) {
+                    wednesdayIsActive = true;
+
+                    if (mondayIsActive) {
+                        mondayIsActive = false;
+                        monday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (tuesdayIsActive) {
+                        tuesdayIsActive = false;
+                        tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (thursdayIsActive) {
+                        thursdayIsActive = false;
+                        thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (fridayIsActive) {
+                        fridayIsActive = false;
+                        friday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (saturdayIsActive) {
+                        saturdayIsActive = false;
+                        saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+
+                    wednesday.setTextColor(getResources().getColor(R.color.pinkColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "2");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "2");
+                    }
+                } else {
+                    wednesdayIsActive = false;
+                    wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "");
+                    }
+                }
+            }
+
+            if (v.getId() == thursday.getId()) {
+                if (!thursdayIsActive) {
+                    thursdayIsActive = true;
+
+                    if (mondayIsActive) {
+                        mondayIsActive = false;
+                        monday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (tuesdayIsActive) {
+                        tuesdayIsActive = false;
+                        tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (wednesdayIsActive) {
+                        wednesdayIsActive = false;
+                        wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (fridayIsActive) {
+                        fridayIsActive = false;
+                        friday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (saturdayIsActive) {
+                        saturdayIsActive = false;
+                        saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+
+                    thursday.setTextColor(getResources().getColor(R.color.pinkColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "3");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "3");
+                    }
+                } else {
+                    thursdayIsActive = false;
+                    thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "");
+                    }
+                }
+            }
+
+            if (v.getId() == friday.getId()) {
+                if (!fridayIsActive) {
+                    fridayIsActive = true;
+
+                    if (mondayIsActive) {
+                        mondayIsActive = false;
+                        monday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (tuesdayIsActive) {
+                        tuesdayIsActive = false;
+                        tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (wednesdayIsActive) {
+                        wednesdayIsActive = false;
+                        wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (thursdayIsActive) {
+                        thursdayIsActive = false;
+                        thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (saturdayIsActive) {
+                        saturdayIsActive = false;
+                        saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+
+                    friday.setTextColor(getResources().getColor(R.color.pinkColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "4");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "4");
+                    }
+                } else {
+                    fridayIsActive = false;
+                    friday.setTextColor(getResources().getColor(R.color.greyColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "");
+                    }
+                }
+            }
+
+            if (v.getId() == saturday.getId()) {
+                if (!saturdayIsActive) {
+                    saturdayIsActive = true;
+
+                    if (mondayIsActive) {
+                        mondayIsActive = false;
+                        monday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (tuesdayIsActive) {
+                        tuesdayIsActive = false;
+                        tuesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (wednesdayIsActive) {
+                        wednesdayIsActive = false;
+                        wednesday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (thursdayIsActive) {
+                        thursdayIsActive = false;
+                        thursday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+                    if (fridayIsActive) {
+                        fridayIsActive = false;
+                        friday.setTextColor(getResources().getColor(R.color.greyColor));
+                    }
+
+                    saturday.setTextColor(getResources().getColor(R.color.pinkColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "5");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "5");
+                    }
+                } else {
+                    saturdayIsActive = false;
+                    saturday.setTextColor(getResources().getColor(R.color.greyColor));
+                    if (activeScheduleWeek == 0) {
+                        onGetScheduleRequestCompleted("now", "");
+                    } else {
+                        onGetScheduleRequestCompleted("next", "");
+                    }
+                }
+            }
+        }
+    }
 
 
     // обработчик нажатий на предметы в lessons
@@ -2595,7 +3415,8 @@ public class MainActivity extends AppCompatActivity {
                             String point = valueInfo.getString("point").toString().equals("null")  ? "нет" : valueInfo.getString("point");
                             if (point.equals("1")) point = "зачет";
                             String delay = valueInfo.getString("delay").toString().equals("null")  ? "нет" : "да";
-                            String performance = valueInfo.getString("performance").equals("null") ? "нет" : "да";
+                            String performance = valueInfo.getString("performance").equals("null") ? "нет" : "▲";
+                            if (valueInfo.getString("performance").equals("2")) performance = "▼";
 
 
 
