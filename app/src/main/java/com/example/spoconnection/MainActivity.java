@@ -72,22 +72,26 @@ public class MainActivity extends AppCompatActivity {
     final Integer STATS_REQUEST_CONNECT_TIMEOUT                 = 5;  // в секундах
     final Integer LOGIN_REQUEST_CONNECT_TIMEOUT                 = 5;
     final Integer MAIN_DATA_REQUEST_CONNECT_TIMEOUT             = 5;
-    final Integer STUDENT_PROFILE_REQUEST_CONNECT_TIMEOUT       = 5;
+    final Integer STUDENT_PROFILE_REQUEST_CONNECT_TIMEOUT       = 8;
     final Integer SCHEDULE_REQUEST_CONNECT_TIMEOUT              = 5;
     final Integer EXERCISES_BY_DAY_REQUEST_CONNECT_TIMEOUT      = 5;
     final Integer EXERCISES_BY_LESSON_REQUEST_CONNECT_TIMEOUT   = 5;
     final Integer VK_POSTS_REQUEST_CONNECT_TIMEOUT              = 5;
     final Integer FINAL_MARKS_REQUEST_CONNECT_TIMEOUT           = 5;
+    final Integer ALL_FINAL_MARKS_REQUEST_CONNECT_TIMEOUT       = 5;
+    final Integer RATING_REQUEST_CONNECT_TIMEOUT                = 5;
 
     final Integer STATS_REQUEST_READ_TIMEOUT                 = 5;  // в секундах
     final Integer LOGIN_REQUEST_READ_TIMEOUT                 = 5;
     final Integer MAIN_DATA_REQUEST_READ_TIMEOUT             = 5;
-    final Integer STUDENT_PROFILE_REQUEST_READ_TIMEOUT       = 5;
+    final Integer STUDENT_PROFILE_REQUEST_READ_TIMEOUT       = 8;
     final Integer SCHEDULE_REQUEST_READ_TIMEOUT              = 5;
     final Integer EXERCISES_BY_DAY_REQUEST_READ_TIMEOUT      = 5;
     final Integer EXERCISES_BY_LESSON_REQUEST_READ_TIMEOUT   = 5;
     final Integer VK_POSTS_REQUEST_READ_TIMEOUT              = 5;
     final Integer FINAL_MARKS_REQUEST_READ_TIMEOUT           = 5;
+    final Integer ALL_FINAL_MARKS_REQUEST_READ_TIMEOUT       = 5;
+    final Integer RATING_REQUEST_READ_TIMEOUT                = 5;
 
     // Переменные, получаемые с запросов
 
@@ -113,10 +117,13 @@ public class MainActivity extends AppCompatActivity {
     public JSONObject readyExercisesByLesson = new JSONObject();
     public JSONObject readyExercisesByLessonVisits = new JSONObject();
 
-    public JSONArray studentFinalMarks;
+    public JSONArray studentFinalMarks = new JSONArray();
+    public JSONArray studentAllFinalMarks = new JSONArray();
 
     // by vk api
     public JSONObject vkWallPosts;
+
+    public JSONObject ratingInfo;
 
     // Handlers для проверки на выполнение запроса
 
@@ -138,6 +145,8 @@ public class MainActivity extends AppCompatActivity {
     RequestStatus getScheduleRequestStatus;
     RequestStatus getStudentStatsRequestStatus;
     RequestStatus getFinalMarksRequestStatus;
+    RequestStatus getAllFinalMarksRequestStatus;
+    RequestStatus ratingRequestStatus;
 
 
     // Переменная, чтобы buildFrontend не вызвался дважды (и после getMainData и после getByDay)
@@ -166,6 +175,10 @@ public class MainActivity extends AppCompatActivity {
     public LinearLayout userHelpScreen;
     public LinearLayout notificationListScreen;
     public RelativeLayout loadingScreen;
+    public RelativeLayout settingsScreen;
+    public RelativeLayout itogScreen;
+    public RelativeLayout errorScreen;
+    public RelativeLayout backConnectScreen;
 
 
     // массив расписания
@@ -223,7 +236,29 @@ public class MainActivity extends AppCompatActivity {
         userHelpScreen = findViewById(R.id.userHelp);
         notificationListScreen = findViewById(R.id.notificationListScreen);
         loadingScreen = findViewById(R.id.loadingScreen);
+        settingsScreen = findViewById(R.id.settingsScreen);
+        itogScreen = findViewById(R.id.itogScreen);
+        errorScreen = findViewById(R.id.errorScreen);
+        backConnectScreen = findViewById(R.id.backConnectScreen);
 
+        // издержки
+
+        TextView settingsSyncUnicodeField = findViewById(R.id.settingsSyncUnicodeField);
+        settingsSyncUnicodeField.setText("↻");
+        TextView settingsExitUnicodeField = findViewById(R.id.settingsExitUnicodeField);
+        settingsExitUnicodeField.setText("\uD83D\uDEAA");
+
+        //Выход из аккаунта
+
+        RelativeLayout settingsExit = findViewById(R.id.settingsExit);
+        settingsExit.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                resetApp();
+//                setContainer(ContainerName.LOGIN);
+                setLoginFormContainer();
+            }
+        });
 
         // Инициализируем навигацию
 
@@ -265,11 +300,14 @@ public class MainActivity extends AppCompatActivity {
         scheduleNext = findViewById(R.id.next);
 
         // инициаизируем переменные для очистки их при выходе (важно)
+
         profileUserName = findViewById(R.id.profileUserName);
         profileUserGroup = findViewById(R.id.profileUserGroup);
         profileUserCalendar = findViewById(R.id.profileUserCalendar);
         profileUserBalls = findViewById(R.id.profileUserBalls);
         profileUserBills = findViewById(R.id.profileUserBills);
+        scheduleList = findViewById(R.id.scheduleList);
+        lessonsList = findViewById(R.id.lessonsList);
 
         // локальные кнопки экранов
 //        scheduleChanges = findViewById(R.id.notificationSchedule);
@@ -388,6 +426,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // ссылки с настроек
+
+        RelativeLayout settingsBackConnectLink = findViewById(R.id.settingsBackConnectLink);
+
         // ссылки с главной
 
         RelativeLayout homeProfileLink = findViewById(R.id.homeProfileLink);
@@ -395,7 +437,7 @@ public class MainActivity extends AppCompatActivity {
         RelativeLayout homeLessonsLink = findViewById(R.id.homeLessonsLink);
         RelativeLayout homeNotificationLink = findViewById(R.id.homeNotificationLink);
         RelativeLayout homeItogLink = findViewById(R.id.homeItogLink);
-        RelativeLayout homeAchivLink = findViewById(R.id.homeAchivLink);
+//        RelativeLayout homeAchivLink = findViewById(R.id.homeAchivLink);
 
         homeProfileLink.setOnClickListener(new View.OnClickListener() {
             @Override
@@ -423,6 +465,20 @@ public class MainActivity extends AppCompatActivity {
                 setLoadingToList(ContainerName.NOTIFICATION);
             }
         });
+        homeItogLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.ITOG);
+//                setLoadingToList(ContainerName.ITOG);
+            }
+        });
+
+        settingsBackConnectLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.BACKCONNECT);
+            }
+        });
 
 
         // в начале убираем все экраны
@@ -436,6 +492,10 @@ public class MainActivity extends AppCompatActivity {
         main.removeView(userHelpScreen);
         main.removeView(notificationListScreen);
         main.removeView(loginForm);
+        main.removeView(settingsScreen);
+        main.removeView(itogScreen);
+        main.removeView(errorScreen);
+        main.removeView(backConnectScreen);
         activeContainer = ContainerName.LOADING;
 
         resetRequestsStatuses();
@@ -507,7 +567,8 @@ public class MainActivity extends AppCompatActivity {
                     getStudentProfileDataRequestStatus = RequestStatus.COMPLETED;
 
                     sendLoginRequest(new String[] { name, password });
-                    // иначе пропускаем вход в аккаунт
+
+                // иначе пропускаем вход в аккаунт, вместо этого берем данные из хранилища
                 } else {
                     System.out.println("Cookie lifetime is less then " + COOKIE_LIFETIME + " minutes. Continue");
                     authCookie = preferences.getString("authCookie", "");
@@ -522,15 +583,7 @@ public class MainActivity extends AppCompatActivity {
                     statsPercentageOfVisits = preferences.getString("studentStatsPercentageOfVisits", "");
                     getStudentProfileDataRequestStatus = RequestStatus.COMPLETED;
 
-                    Date date = new Date();
-                    String year = new SimpleDateFormat("yyyy").format(date);
-                    String month = new SimpleDateFormat("MM").format(date);
-                    String day = new SimpleDateFormat("dd").format(date);
-
-                    sendGetStudentStatsRequest();
-                    sendGetFinalMarksRequest();
-                    sendGetStudentMainDataRequest(new String[]{ year, month });
-                    sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
+                    afterLoginRequest();
                 }
 
             } else {
@@ -562,6 +615,37 @@ public class MainActivity extends AppCompatActivity {
 
     /* -------------------------------------------- BackEnd -------------------------------------------- */
 
+    public void afterLoginRequest() {
+
+        Date date = new Date();
+        String year = new SimpleDateFormat("yyyy").format(date);
+        String month = new SimpleDateFormat("MM").format(date);
+        String day = new SimpleDateFormat("dd").format(date);
+
+        preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+
+        String name = preferences.getString("studentName", "");
+        String password = preferences.getString("studentPassword", "");
+
+        System.out.println(studentFIO);
+
+        // долги, посещения, средний балл
+        sendGetStudentStatsRequest();
+        // оценки за последний семестр
+        sendGetFinalMarksRequest();
+        // оценки за все семестры
+        sendGetAllFinalMarksRequest();
+        // если необходимо, парсим страницу с профилем
+        if (getStudentProfileDataRequestStatus != RequestStatus.COMPLETED)
+            sendGetStudentProfileDataRequest();
+        // получение рейтинга
+        sendRatingRequest(new String[] { name, password });
+        // учителя, предметы
+        sendGetStudentMainDataRequest(new String[]{ year, month });
+        // пары за сегодня
+        sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
+    }
+
     public void resetRequestsStatuses() {
         loginRequestStatus                    = RequestStatus.NOT_CALLED;
         getStudentMainDataRequestStatus       = RequestStatus.NOT_CALLED;
@@ -572,9 +656,21 @@ public class MainActivity extends AppCompatActivity {
         getScheduleRequestStatus              = RequestStatus.NOT_CALLED;
         getStudentStatsRequestStatus          = RequestStatus.NOT_CALLED;
         getFinalMarksRequestStatus            = RequestStatus.NOT_CALLED;
+        getAllFinalMarksRequestStatus         = RequestStatus.NOT_CALLED;
+        ratingRequestStatus                   = RequestStatus.NOT_CALLED;
     }
 
     public void resetApp() {
+
+        profileUserName.setText("");
+        profileUserGroup.setText("");
+        profileUserCalendar.setText("");
+        profileUserBalls.setText("");
+        profileUserBills.setText("");
+//        todayLessonsView.removeAllViews();
+        todayLessonsView.removeAllViews();
+        scheduleList.removeAllViews();
+        lessonsList.removeAllViews();
 
         preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
         preferencesEditor = preferences.edit();
@@ -636,20 +732,25 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // Когда отпраили все запросы для входа в акаунт
-    public void onAuthCompleted() {
+    public void onFirstRequestsFinished() {
 
-        System.out.println("---------");
-        System.out.println("Stats request: " + getStudentStatsRequestStatus);
-        System.out.println("Final marks request: " + getFinalMarksRequestStatus);
-        System.out.println("Main data request: " + getStudentMainDataRequestStatus);
-        System.out.println("Student profile data request: " + getStudentProfileDataRequestStatus);
-        System.out.println("Exercises by day request: " + getExercisesByDayRequestStatus);
-        System.out.println("---------");
+        System.out.println("+--------");
+        System.out.println("| Stats request: " + getStudentStatsRequestStatus);
+        System.out.println("| Final marks request: " + getFinalMarksRequestStatus);
+        System.out.println("| All final marks request: " + getAllFinalMarksRequestStatus);
+        System.out.println("| Main data request: " + getStudentMainDataRequestStatus);
+        System.out.println("| Student profile data request: " + getStudentProfileDataRequestStatus);
+        System.out.println("| Rating request: " + ratingRequestStatus);
+        System.out.println("| Exercises by day request: " + getExercisesByDayRequestStatus);
+        System.out.println("+--------");
 
         if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
-                && getStudentMainDataRequestStatus == RequestStatus.COMPLETED
-                && getExercisesByDayRequestStatus  == RequestStatus.COMPLETED
-                && getFinalMarksRequestStatus      == RequestStatus.COMPLETED
+                && getStudentMainDataRequestStatus    == RequestStatus.COMPLETED
+                && getExercisesByDayRequestStatus     == RequestStatus.COMPLETED
+                && getFinalMarksRequestStatus         == RequestStatus.COMPLETED
+                && getAllFinalMarksRequestStatus      == RequestStatus.COMPLETED
+//                && ratingRequestStatus                == RequestStatus.COMPLETED
+                && getStudentProfileDataRequestStatus == RequestStatus.COMPLETED
         ) {
             preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
             preferencesEditor = preferences.edit();
@@ -662,8 +763,13 @@ public class MainActivity extends AppCompatActivity {
             String name = preferences.getString("studentName", "");
             String password = preferences.getString("studentPassword", "");
 
+//            resetApp();
+            resetRequestsStatuses();
+            preferencesEditor = preferences.edit();
+            preferencesEditor.clear();
+            preferencesEditor.apply();
+
             setLoginFormContainer(name, password);
-            resetApp();
         }
     }
 
@@ -671,6 +777,8 @@ public class MainActivity extends AppCompatActivity {
 
     private void sendLoginRequest(String[] params) {
         setContainer(ContainerName.LOADING);
+        main.removeView(errorScreen);
+        main.removeView(itogScreen);
 //        loadingScreen.setBackgroundResource(R.drawable.anim_loading);
 //        AnimationDrawable anim = (AnimationDrawable) loadingScreen.getBackground();
 //        anim.setEnterFadeDuration(500);
@@ -729,6 +837,18 @@ public class MainActivity extends AppCompatActivity {
         request.execute();
     }
 
+    private void sendGetAllFinalMarksRequest() {
+        getAllFinalMarksRequest request = new getAllFinalMarksRequest();
+        getAllFinalMarksRequestStatus = RequestStatus.CALLED;
+        request.execute();
+    }
+
+    private void sendRatingRequest(String[] params) {
+        RatingRequest request = new RatingRequest();
+        ratingRequestStatus = RequestStatus.CALLED;
+        request.execute(params);
+    }
+
     // Колбеки, которые вызываются при завершении определенного запроса
 
     public void onLoginRequestCompleted(String[] response) {
@@ -763,25 +883,22 @@ public class MainActivity extends AppCompatActivity {
             preferencesEditor.putString("studentPassword", studentPassword);
             preferencesEditor.apply();
 
-            // После входа в акк загружаем предметы, учителей и пары за сегодня
-
-            Date date = new Date();
-            String year = new SimpleDateFormat("yyyy").format(date);
-            String month = new SimpleDateFormat("MM").format(date);
-            String day = new SimpleDateFormat("dd").format(date);
-
-            sendGetStudentStatsRequest();
-            sendGetFinalMarksRequest();
-            sendGetStudentMainDataRequest(new String[]{ year, month });
-            if (getStudentProfileDataRequestStatus != RequestStatus.COMPLETED) sendGetStudentProfileDataRequest();
-            sendGetExercisesByDayRequest(new String[] { year + "-" + month + "-" + day }); // 2020-02-26
+            afterLoginRequest();
 
         } else {
             loginRequestStatus = RequestStatus.EMPTY_RESPONSE;
             System.out.println("Login request empty response!");
 
+//            setLoginFormContainer(studentName, studentPassword);
+//            resetApp();
+
+            resetRequestsStatuses();
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
+            preferencesEditor.clear();
+            preferencesEditor.apply();
+
             setLoginFormContainer(studentName, studentPassword);
-            resetApp();
         }
     }
 
@@ -863,7 +980,7 @@ public class MainActivity extends AppCompatActivity {
             System.out.println("Exercises by day request empty response!");
         }
 
-        onAuthCompleted();
+        onFirstRequestsFinished();
     }
 
     public void onGetExercisesByLessonRequestCompleted (String[] response) {
@@ -1235,22 +1352,22 @@ public class MainActivity extends AppCompatActivity {
         else if ( !(studentFIO.isEmpty() || studentGroup.isEmpty() || studentAvatarSrc.isEmpty()) ) {
             getStudentProfileDataRequestStatus = RequestStatus.COMPLETED;
 
-            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
-            preferencesEditor = preferences.edit();
-
-            preferencesEditor.putString("studentFIO", studentFIO);
-            preferencesEditor.putString("studentGroup", studentGroup);
-            preferencesEditor.putString("studentAvatarSrc", studentAvatarSrc);
-
-            preferencesEditor.putString("studentStatsMidMark", statsMidMark);
-            preferencesEditor.putString("studentStatsDebtsCount", statsDebtsCount);
-            preferencesEditor.putString("studentStatsPercentageOfVisits", statsPercentageOfVisits);
-
-            preferencesEditor.apply();
-
-            this.studentFIO = studentFIO;
-            this.studentGroup = studentGroup;
-            this.studentAvatarSrc = studentAvatarSrc;
+//            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+//            preferencesEditor = preferences.edit();
+//
+//            preferencesEditor.putString("studentFIO", studentFIO);
+//            preferencesEditor.putString("studentGroup", studentGroup);
+//            preferencesEditor.putString("studentAvatarSrc", studentAvatarSrc);
+//
+//            preferencesEditor.putString("studentStatsMidMark", statsMidMark);
+//            preferencesEditor.putString("studentStatsDebtsCount", statsDebtsCount);
+//            preferencesEditor.putString("studentStatsPercentageOfVisits", statsPercentageOfVisits);
+//
+//            preferencesEditor.apply();
+//
+//            this.studentFIO = studentFIO;
+//            this.studentGroup = studentGroup;
+//            this.studentAvatarSrc = studentAvatarSrc;
 
 //            if (getExercisesByDayRequestStatus == RequestStatus.COMPLETED && getStudentMainDataRequestStatus == RequestStatus.COMPLETED && !buildFrontendCalled) {
 //                buildFrontendCalled = true;
@@ -1673,6 +1790,16 @@ public class MainActivity extends AppCompatActivity {
             this.statsMidMark = statsMidMark;
             this.statsDebtsCount = statsDebtsCount;
             this.statsPercentageOfVisits = statsPercentageOfVisits;
+
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
+
+            preferencesEditor.putString("studentStatsMidMark", statsMidMark);
+            preferencesEditor.putString("studentStatsDebtsCount", statsDebtsCount);
+            preferencesEditor.putString("studentStatsPercentageOfVisits", statsPercentageOfVisits);
+
+            preferencesEditor.apply();
+
         } else {
             getStudentStatsRequestStatus = RequestStatus.EMPTY_RESPONSE;
             System.out.println("Student stats request empty response!");
@@ -1691,6 +1818,44 @@ public class MainActivity extends AppCompatActivity {
         }
         else {
 
+        }
+    }
+
+    public void onGetAllFinalMarksRequestCompleted() {
+
+        if (getAllFinalMarksRequestStatus == RequestStatus.CALLED) {
+            getAllFinalMarksRequestStatus = RequestStatus.COMPLETED;
+        }
+        else if (getAllFinalMarksRequestStatus == RequestStatus.FAILED) {
+
+        }
+        else if (getAllFinalMarksRequestStatus == RequestStatus.TIMEOUT) {
+
+        }
+        else {
+
+        }
+    }
+
+    public void onRatingRequestCompleted(String response) {
+        if (!response.isEmpty()) {
+            ratingRequestStatus = RequestStatus.COMPLETED;
+
+            try {
+                 ratingInfo = new JSONObject(response);
+                 System.out.println(ratingInfo);
+            } catch (JSONException e) {
+
+            }
+        }
+        else if (ratingRequestStatus == RequestStatus.FAILED) {
+
+        }
+        else if (ratingRequestStatus == RequestStatus.TIMEOUT) {
+
+        }
+        else {
+            ratingRequestStatus = RequestStatus.EMPTY_RESPONSE;
         }
     }
 
@@ -1909,8 +2074,8 @@ public class MainActivity extends AppCompatActivity {
             String responseBody = "";
             Document html = new Document(responseBody);
 
-            String studentFIO = "";
-            String studentGroup = "";
+            String FIO = "";
+            String group = "";
             String avatarSrc = "";
 
             Element row = null;
@@ -1931,15 +2096,15 @@ public class MainActivity extends AppCompatActivity {
                     }
                 }
 
-                studentFIO = row.getElementsByClass("span9").select("h3").get(0).text();
-                studentGroup = row.getElementsByClass("span9").get(0)
+                FIO = row.getElementsByClass("span9").select("h3").get(0).text();
+                group = row.getElementsByClass("span9").get(0)
                         .getElementsByClass("row").get(0)
                         .getElementsByClass("span3").select("ul").select("li").last().text();
                 avatarSrc = row.getElementsByClass("span3").get(0)
                         .getElementsByClass("showchange").get(0)
                         .getElementsByTag("img").get(0).attr("src");
 
-                studentGroup = studentGroup.split(" ")[0];
+                group = group.split(" ")[0];
 
             } catch (SocketTimeoutException e) {
                 System.out.println("Student's profile data request timeout!");
@@ -1965,6 +2130,23 @@ public class MainActivity extends AppCompatActivity {
             } catch (IOException e) {
                 e.printStackTrace();
             }
+
+            studentFIO = FIO;
+            studentGroup = group;
+            studentAvatarSrc = avatarSrc;
+
+            preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+            preferencesEditor = preferences.edit();
+
+            preferencesEditor.putString("studentFIO", studentFIO);
+            preferencesEditor.putString("studentGroup", studentGroup);
+            preferencesEditor.putString("studentAvatarSrc", studentAvatarSrc);
+
+//            preferencesEditor.putString("studentStatsMidMark", statsMidMark);
+//            preferencesEditor.putString("studentStatsDebtsCount", statsDebtsCount);
+//            preferencesEditor.putString("studentStatsPercentageOfVisits", statsPercentageOfVisits);
+
+            preferencesEditor.apply();
 
             return new String[] { studentFIO, studentGroup, avatarSrc };
         }
@@ -2212,6 +2394,8 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    String finalMarksSemestr = "";
+
     class getFinalMarksRequest extends AsyncTask<Void, Void, Void> {
 
         protected Void doInBackground(Void... params) {
@@ -2226,6 +2410,14 @@ public class MainActivity extends AppCompatActivity {
                 responseBody = Functions.getResponseFromGetRequest(urlConnection);
 
                 html = Jsoup.parse(responseBody);
+
+                finalMarksSemestr = html.body()
+                        .getElementsByClass("container").get(0)
+                        .getElementsByClass("row").get(1)
+                        .getElementsByClass("span12").get(0)
+                        .select("p").get(0).text();
+
+                System.out.println("sem: " + finalMarksSemestr);
 
                 Element container = html.body()
                         .getElementsByClass("container").get(0)
@@ -2266,7 +2458,7 @@ public class MainActivity extends AppCompatActivity {
                     array.put(temp);
                 }
 
-//                System.out.println(array);
+                System.out.println("final marks: " + array);
 
                 studentFinalMarks = array;
 
@@ -2292,6 +2484,143 @@ public class MainActivity extends AppCompatActivity {
         protected void onPostExecute(Void result) {
             super.onPostExecute(result);
             onGetFinalMarksRequestCompleted();
+
+        }
+    }
+
+    class getAllFinalMarksRequest extends AsyncTask<Void, Void, Void> {
+
+        protected Void doInBackground(Void... params) {
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+            Document html = new Document(responseBody);
+
+            try {
+                String url_address = "https://ifspo.ifmo.ru/profile/recordBook?student=" + studentId;
+
+                urlConnection = Functions.setupGETAuthRequest(url_address, authCookie, ALL_FINAL_MARKS_REQUEST_CONNECT_TIMEOUT, ALL_FINAL_MARKS_REQUEST_READ_TIMEOUT);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+
+                html = Jsoup.parse(responseBody);
+
+                Element container = html.body()
+                        .getElementsByClass("container").get(0)
+                        .getElementsByClass("row").get(1)
+                        .getElementsByClass("span12").get(0);
+
+//                System.out.println(container.toString());
+
+                String semester;
+                String name;
+                String hours;
+                String mark;
+
+                JSONArray allMarks = new JSONArray();
+
+                for (Element table : container.getElementsByTag("table"))
+                {
+                    semester = table.previousElementSibling().text();
+                    Elements trs = table.getElementsByTag("tbody").get(0).getElementsByTag("tr");
+
+                    JSONObject temp = new JSONObject();
+                    JSONArray tempArray = new JSONArray();
+
+                    temp.put("semester", semester);
+
+                    for (Element tr : trs)
+                    {
+                        if (tr != trs.get(0)) {
+                            Elements tds = tr.getElementsByTag("td");
+
+                            name = tds.get(0).text();
+                            hours = tds.get(1).text();
+                            mark = trs.get(2).text();
+
+                            JSONObject lesson = new JSONObject();
+                            lesson.put("name", name);
+                            lesson.put("hours", hours);
+                            lesson.put("mark", mark);
+
+                            tempArray.put(lesson);
+                        }
+                    }
+
+                    temp.put("lessons", tempArray);
+                    allMarks.put(temp);
+
+                }
+
+
+//                System.out.println(allMarks.toString(2));
+
+//                studentFinalMarks = array;
+
+            } catch (SocketTimeoutException e) {
+                System.out.println("All final marks request timeout!");
+                getAllFinalMarksRequestStatus = RequestStatus.TIMEOUT;
+//                return;
+            } catch (Exception e) {
+                System.out.println("Problems with all final marks request");
+                System.out.println(e.toString());
+                getAllFinalMarksRequestStatus = RequestStatus.FAILED;
+//                return;
+            } finally {
+                if (urlConnection != null) urlConnection.disconnect();
+            }
+
+//            return;
+//            System.out.println("GetProfileParsing Success!");
+
+            return null;
+        }
+
+        protected void onPostExecute(Void result) {
+            super.onPostExecute(result);
+            onGetAllFinalMarksRequestCompleted();
+
+        }
+    }
+
+    class RatingRequest extends AsyncTask<String[], Void, String> {
+
+        protected String doInBackground(String[]... params) {
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+
+            String name = params[0][0];
+            String password = params[0][1];
+//            String fio = params[0][2];
+//            String group = params[0][3];
+
+            try {
+                String url_address = "https://spoconnection-rating-server.herokuapp.com/rating"
+                        + "?name=" + name
+                        + "&password=" + password
+                        + "&fio=" + studentFIO
+                        + "&group=" + studentGroup;
+
+                urlConnection = Functions.setupGETAuthRequest(url_address, authCookie, RATING_REQUEST_CONNECT_TIMEOUT, RATING_REQUEST_READ_TIMEOUT);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+
+            } catch (SocketTimeoutException e) {
+                System.out.println("Rating request timeout!");
+                ratingRequestStatus = RequestStatus.TIMEOUT;
+                return "";
+            } catch (Exception e) {
+                System.out.println("Problems with rating request");
+                System.out.println(e.toString());
+                ratingRequestStatus = RequestStatus.FAILED;
+                return "";
+            } finally {
+                if (urlConnection != null) urlConnection.disconnect();
+            }
+
+            return responseBody;
+        }
+
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            onRatingRequestCompleted(result);
 
         }
     }
@@ -2333,6 +2662,8 @@ public class MainActivity extends AppCompatActivity {
     TextView profileUserBalls;
     TextView profileUserBills;
     LinearLayout todayLessonsView;
+    LinearLayout scheduleList;
+    LinearLayout lessonsList;
 
     // Все для анимации навигации
 
@@ -2353,7 +2684,7 @@ public class MainActivity extends AppCompatActivity {
 
     // переменная для мониторинга активного контейнера
 
-    enum ContainerName { PROFILE, HOME, SCHEDULE, LESSONS, LESSONS_INFORMATION, NOTIFICATION, LOADING, LOGIN }
+    enum ContainerName { PROFILE, HOME, SCHEDULE, LESSONS, LESSONS_INFORMATION, NOTIFICATION, LOADING, LOGIN, SETTINGS, ITOG, ERROR, BACKCONNECT }
     ContainerName activeContainer;
 
 
@@ -2402,12 +2733,37 @@ public class MainActivity extends AppCompatActivity {
                 main.removeView(notificationListScreen);
                 break;
             }
+            case SETTINGS: {
+                settingsNavImg.setImageResource(R.drawable.settings);
+                settingsNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                settingsNavText.setShadowLayer(0,0,0,0);
+                main.removeView(settingsScreen);
+                break;
+            }
+            case ITOG: {
+                lessonsNavImg.setImageResource(R.drawable.subject);
+                lessonsNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                lessonsNavText.setShadowLayer(0,0,0,0);
+                main.removeView(itogScreen);
+                break;
+            }
+            case BACKCONNECT: {
+                settingsNavImg.setImageResource(R.drawable.settings);
+                settingsNavText.setTextColor(getResources().getColor(R.color.greyColor));
+                settingsNavText.setShadowLayer(0,0,0,0);
+                main.removeView(backConnectScreen);
+                break;
+            }
             case LOGIN: {
                 main.removeView(loginForm);
                 break;
             }
             case LOADING: {
                 main.removeView(loadingScreen);
+            }
+            case ERROR: {
+                main.removeView(errorScreen);
+                break;
             }
         }
 
@@ -2465,6 +2821,22 @@ public class MainActivity extends AppCompatActivity {
                 activeContainer = ContainerName.NOTIFICATION;
                 break;
             }
+            case SETTINGS: {
+                settingsNavImg.setImageResource(R.drawable.settings_active);
+                settingsNavText.setTextColor(getResources().getColor(R.color.white));
+                settingsNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
+                main.addView(settingsScreen);
+                activeContainer = ContainerName.SETTINGS;
+                break;
+            }
+            case BACKCONNECT: {
+                settingsNavImg.setImageResource(R.drawable.settings_active);
+                settingsNavText.setTextColor(getResources().getColor(R.color.white));
+                settingsNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
+                main.addView(backConnectScreen);
+                activeContainer = ContainerName.BACKCONNECT;
+                break;
+            }
             case LOGIN: {
                 main.removeAllViews();
                 main.addView(loginForm);
@@ -2474,6 +2846,92 @@ public class MainActivity extends AppCompatActivity {
             case LOADING: {
                 main.addView(loadingScreen);
                 activeContainer = ContainerName.LOADING;
+            }
+            case ERROR: {
+                main.addView(errorScreen);
+                activeContainer = ContainerName.ERROR;
+            }
+            case ITOG: {
+                lessonsNavImg.setImageResource(R.drawable.subject_active);
+                lessonsNavText.setTextColor(getResources().getColor(R.color.white));
+                lessonsNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
+                main.addView(itogScreen);
+                activeContainer = ContainerName.ITOG;
+                TextView itogLessonsSem = findViewById(R.id.itogLessonsSem);
+                itogLessonsSem.setText(finalMarksSemestr);
+
+                int dp = (int) getResources().getDisplayMetrics().density;
+                Typeface light = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_light);
+                Typeface medium = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_medium);
+                Typeface semibold = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_semibold);
+                Typeface regular = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_regular);
+
+                LinearLayout itogList = findViewById(R.id.itogList);
+                itogList.removeAllViews();
+
+                for (int i = 0; i < studentFinalMarks.length(); i++) {
+
+                    RelativeLayout tmp = new RelativeLayout(getApplicationContext());
+                    RelativeLayout.LayoutParams tmpLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                    tmpLP.setMargins(0, 5*dp,0,0);
+                    tmp.setLayoutParams(tmpLP);
+                    tmp.setBackgroundResource(R.drawable.forms_example);
+                    itogList.addView(tmp);
+
+                    LinearLayout tempBox = new LinearLayout(getApplicationContext());
+                    LinearLayout.LayoutParams tempBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT);
+                    tempBoxLP.setMargins(5*dp,15*dp,5*dp,15*dp);
+                    tempBox.setLayoutParams(tempBoxLP);
+                    tempBox.setOrientation(LinearLayout.HORIZONTAL);
+                    tmp.addView(tempBox);
+
+                    TextView tempName = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 2);
+                    tempName.setLayoutParams(tempNameLP);
+                    tempName.setTextSize(12);
+                    tempName.setTextColor(getResources().getColor(R.color.white));
+                    tempName.setTypeface(medium);
+                    try {
+                        tempName.setText(studentFinalMarks.getJSONObject(i).getString("name"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempName);
+
+                    TextView tempAbs = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempAbsLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                    tempAbs.setLayoutParams(tempAbsLP);
+                    tempAbs.setTextSize(12);
+                    tempAbs.setTextColor(getResources().getColor(R.color.pinkColor));
+                    tempAbs.setTypeface(semibold);
+                    tempAbs.setGravity(Gravity.CENTER);
+                    try {
+                        String was = studentFinalMarks.getJSONObject(i).getString("was");
+                        was = was.split(" ")[0];
+                        String all = studentFinalMarks.getJSONObject(i).getString("all");
+                        all = all.split(" ")[0];
+                        tempAbs.setText(was + "/" + all);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempAbs);
+
+                    TextView tempMark = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempMarkLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                    tempMark.setLayoutParams(tempMarkLP);
+                    tempMark.setTextSize(12);
+                    tempMark.setTextColor(getResources().getColor(R.color.pinkColor));
+                    tempMark.setTypeface(semibold);
+                    tempMark.setGravity(Gravity.CENTER);
+                    try {
+                        tempMark.setText(studentFinalMarks.getJSONObject(i).getString("mark"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempMark);
+                }
+
+                break;
             }
         }
     }
@@ -2618,6 +3076,10 @@ public class MainActivity extends AppCompatActivity {
         // убираем регистрацию и подрубаем стартовый экран
         main.removeView(loadingScreen);
         main.removeView(loginForm);
+        main.removeView(errorScreen);
+        main.removeView(itogScreen);
+        main.removeView(settingsScreen);
+        main.removeView(backConnectScreen);
         setContainer(ContainerName.PROFILE);
         main.addView(navigation);
         main.addView(userHelpScreen);
@@ -2932,6 +3394,23 @@ public class MainActivity extends AppCompatActivity {
                     main.removeView(notificationListScreen);
                     break;
                 }
+                case SETTINGS: {
+                    if (v.getId() == settings.getId()) return;
+                    main.removeView(settingsScreen);
+                    break;
+                }
+                case BACKCONNECT: {
+                    main.removeView(backConnectScreen);
+                    break;
+                }
+                case ERROR: {
+                    main.removeView(errorScreen);
+                    break;
+                }
+                case ITOG: {
+                    main.removeView(itogScreen);
+                    break;
+                }
             }
 
             // и добавляем новый
@@ -2962,8 +3441,10 @@ public class MainActivity extends AppCompatActivity {
             }
 
             if (v.getId() == settings.getId()) {
-                resetApp();
-                setLoginFormContainer();
+                System.out.println("You clicked settings");
+                setContainer(ContainerName.SETTINGS);
+//                resetApp();
+//                setLoginFormContainer();
             }
 
             // но если кликнута кнопка изменений в расписании, нужно еще выкинуть контент от вк
