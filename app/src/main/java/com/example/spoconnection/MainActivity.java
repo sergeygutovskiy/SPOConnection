@@ -22,6 +22,7 @@ import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
 
+import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.widget.Button;
 import android.widget.ImageView;
@@ -156,8 +157,14 @@ public class MainActivity extends AppCompatActivity {
 
     Boolean nowWeekScheduleCalled = false;
     Boolean nextWeekScheduleCalled = false;
+    Boolean itogMarksAreReady = false;
 
     Boolean appFirstRun = false;
+
+    // рейтинг
+
+    TextView ratingPlace;
+    TextView ratingCount;
 
 
     // контейнеры
@@ -179,6 +186,8 @@ public class MainActivity extends AppCompatActivity {
     public RelativeLayout itogScreen;
     public RelativeLayout errorScreen;
     public RelativeLayout backConnectScreen;
+
+    public RelativeLayout settingsSync;
 
 
     // массив расписания
@@ -212,6 +221,7 @@ public class MainActivity extends AppCompatActivity {
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
+
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
 
@@ -241,7 +251,19 @@ public class MainActivity extends AppCompatActivity {
         errorScreen = findViewById(R.id.errorScreen);
         backConnectScreen = findViewById(R.id.backConnectScreen);
 
+        settingsSync = findViewById(R.id.settingsSync);
+
+        // webView
+
+        WebView gif = findViewById(R.id.loadingWebView);
+//        WebSettings ws = gif.getSettings();
+//        ws.setJavaScriptEnabled(true);
+        gif.loadUrl("file:android_res/drawable/preloader.gif");
+
         // издержки
+
+        ratingPlace = findViewById(R.id.ratePlace);
+        ratingCount = findViewById(R.id.rateCount);
 
         TextView settingsSyncUnicodeField = findViewById(R.id.settingsSyncUnicodeField);
         settingsSyncUnicodeField.setText("↻");
@@ -310,7 +332,7 @@ public class MainActivity extends AppCompatActivity {
         lessonsList = findViewById(R.id.lessonsList);
 
         // локальные кнопки экранов
-//        scheduleChanges = findViewById(R.id.notificationSchedule);
+//        scheduleChanges = findVieawById(R.id.notificationSchedule);
 
         // запросы для расписания отправляются только 1 раз
 
@@ -426,6 +448,10 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
+        // ссылки с lessons
+
+        RelativeLayout lessonsItogLink = findViewById(R.id.lessonsScreenItogLink);
+
         // ссылки с настроек
 
         RelativeLayout settingsBackConnectLink = findViewById(R.id.settingsBackConnectLink);
@@ -465,11 +491,28 @@ public class MainActivity extends AppCompatActivity {
                 setLoadingToList(ContainerName.NOTIFICATION);
             }
         });
+
+
         homeItogLink.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
                 setContainer(ContainerName.ITOG);
-//                setLoadingToList(ContainerName.ITOG);
+                // оценки за последний семестр
+                if (!itogMarksAreReady) {
+                    LinearLayout box = findViewById(R.id.itogList);
+                    box.removeAllViews();
+                    LinearLayout checker = findViewById(R.id.onClickItogInfo);
+                    checker.setVisibility(View.INVISIBLE);
+                    setLoadingToList(ContainerName.ITOG);
+
+                    sendGetFinalMarksRequest();
+                    // оценки за все семестры
+                    sendGetAllFinalMarksRequest();
+                    itogMarksAreReady = true;
+                } else {
+                    onGetFinalMarksRequestCompleted();
+                    onGetAllFinalMarksRequestCompleted();
+                }
             }
         });
 
@@ -477,6 +520,29 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 setContainer(ContainerName.BACKCONNECT);
+            }
+        });
+
+        lessonsItogLink.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                setContainer(ContainerName.ITOG);
+                // оценки за последний семестр
+                if (!itogMarksAreReady) {
+                    LinearLayout box = findViewById(R.id.itogList);
+                    box.removeAllViews();
+                    LinearLayout checker = findViewById(R.id.onClickItogInfo);
+                    checker.setVisibility(View.INVISIBLE);
+                    setLoadingToList(ContainerName.ITOG);
+
+                    sendGetFinalMarksRequest();
+                    // оценки за все семестры
+                    sendGetAllFinalMarksRequest();
+                    itogMarksAreReady = true;
+                } else {
+                    onGetFinalMarksRequestCompleted();
+                    onGetAllFinalMarksRequestCompleted();
+                }
             }
         });
 
@@ -613,6 +679,24 @@ public class MainActivity extends AppCompatActivity {
 
     }
 
+    @Override
+    public void onBackPressed() {
+
+        if (activeContainer == ContainerName.PROFILE) {
+            super.onBackPressed();
+        }
+
+        if (activeContainer == ContainerName.LESSONS_INFORMATION) {
+            setContainer(ContainerName.LESSONS);
+        } else if (activeContainer == ContainerName.BACKCONNECT) {
+            setContainer(ContainerName.SETTINGS);
+        } else if (activeContainer == ContainerName.ITOG) {
+            setContainer(ContainerName.LESSONS);
+        } else {
+            setContainer(ContainerName.PROFILE);
+        }
+    }
+
     /* -------------------------------------------- BackEnd -------------------------------------------- */
 
     public void afterLoginRequest() {
@@ -624,17 +708,22 @@ public class MainActivity extends AppCompatActivity {
 
         preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
 
-        String name = preferences.getString("studentName", "");
-        String password = preferences.getString("studentPassword", "");
+        final String name = preferences.getString("studentName", "");
+        final String password = preferences.getString("studentPassword", "");
+
+        settingsSync.setOnClickListener(new View.OnClickListener() {
+            @Override
+            public void onClick(View v) {
+                resetApp();
+                sendLoginRequest(new String[] { name, password });
+            }
+        });
+
 
         System.out.println(studentFIO);
 
         // долги, посещения, средний балл
         sendGetStudentStatsRequest();
-        // оценки за последний семестр
-        sendGetFinalMarksRequest();
-        // оценки за все семестры
-        sendGetAllFinalMarksRequest();
         // если необходимо, парсим страницу с профилем
         if (getStudentProfileDataRequestStatus != RequestStatus.COMPLETED)
             sendGetStudentProfileDataRequest();
@@ -731,6 +820,19 @@ public class MainActivity extends AppCompatActivity {
         });
     }
 
+    //вывод на экран лоадинга текста
+
+    public void loadingLog(String text) {
+        System.out.println(activeContainer);
+        if (activeContainer == ContainerName.LOADING) {
+            TextView box = findViewById(R.id.loadingInfoText);
+            box.setText(text);
+            System.out.println("Yes");
+        } else {
+            System.out.println("No");
+        }
+    }
+
     // Когда отпраили все запросы для входа в акаунт
     public void onFirstRequestsFinished() {
 
@@ -747,8 +849,8 @@ public class MainActivity extends AppCompatActivity {
         if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
                 && getStudentMainDataRequestStatus    == RequestStatus.COMPLETED
                 && getExercisesByDayRequestStatus     == RequestStatus.COMPLETED
-                && getFinalMarksRequestStatus         == RequestStatus.COMPLETED
-                && getAllFinalMarksRequestStatus      == RequestStatus.COMPLETED
+//                && getFinalMarksRequestStatus         == RequestStatus.COMPLETED
+//                && getAllFinalMarksRequestStatus      == RequestStatus.COMPLETED
 //                && ratingRequestStatus                == RequestStatus.COMPLETED
                 && getStudentProfileDataRequestStatus == RequestStatus.COMPLETED
         ) {
@@ -852,6 +954,7 @@ public class MainActivity extends AppCompatActivity {
     // Колбеки, которые вызываются при завершении определенного запроса
 
     public void onLoginRequestCompleted(String[] response) {
+
         String cookie = response[0];
         String studentName = response[1];
         String studentPassword = response[2];
@@ -989,10 +1092,14 @@ public class MainActivity extends AppCompatActivity {
         String lessonId = response[1];
 
         if (getExercisesByLessonRequestStatus == RequestStatus.TIMEOUT) {
-
+            LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
+            lessonsInformationList.removeAllViews();
+            setError(ContainerName.LESSONS_INFORMATION);
         }
         else if (getExercisesByLessonRequestStatus == RequestStatus.FAILED) {
-
+            LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
+            lessonsInformationList.removeAllViews();
+            setError(ContainerName.LESSONS_INFORMATION);
         }
         else if (!responseBody.isEmpty() && activeContainer == ContainerName.LESSONS_INFORMATION) {
             getExercisesByLessonRequestStatus = RequestStatus.COMPLETED;
@@ -1223,18 +1330,47 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void setError(ContainerName check) {
+        switch (check) {
+            case NOTIFICATION: {
+                LinearLayout notificationList = findViewById(R.id.notificationList);
+                notificationList.addView(errorScreen);
+            }
+            case SCHEDULE: {
+                LinearLayout scheduleList = findViewById(R.id.scheduleList);
+                scheduleList.addView(errorScreen);
+                nowWeekScheduleCalled = false;
+                nextWeekScheduleCalled = false;
+            }
+            case ITOG: {
+                LinearLayout itogList = findViewById(R.id.itogList);
+                itogList.addView(errorScreen);
+            }
+            case LESSONS_INFORMATION: {
+                LinearLayout lessonsInformationList = findViewById(R.id.lessonsInformationList);
+                lessonsInformationList.addView(errorScreen);
+            }
+        }
+    }
+
     public void onGetVKWallPostsRequestCompleted (String responseBody) {
 
-        LinearLayout notificationList = findViewById(R.id.notificationList);
-        notificationList.removeAllViews();
+        if (activeContainer != ContainerName.NOTIFICATION) return;
 
         if (getVKWallPostsRequestStatus == RequestStatus.TIMEOUT) {
-
+            LinearLayout notificationList = findViewById(R.id.notificationList);
+            notificationList.removeAllViews();
+            setError(ContainerName.NOTIFICATION);
         }
         else if (getVKWallPostsRequestStatus == RequestStatus.FAILED) {
-
+            LinearLayout notificationList = findViewById(R.id.notificationList);
+            notificationList.removeAllViews();
+            setError(ContainerName.NOTIFICATION);
         }
         else if (!responseBody.isEmpty() && activeContainer == ContainerName.NOTIFICATION) {
+
+            LinearLayout notificationList = findViewById(R.id.notificationList);
+            notificationList.removeAllViews();
             getVKWallPostsRequestStatus = RequestStatus.COMPLETED;
 
             System.out.println("GetVKWallPosts Success!");
@@ -1381,19 +1517,25 @@ public class MainActivity extends AppCompatActivity {
 
     public void onGetScheduleRequestCompleted(String param, String filter) {
 
-        LinearLayout box = findViewById(R.id.scheduleList);
-        box.removeAllViews();
-
-        TextView text = new TextView(getApplicationContext());
-        text.setText(text.getText() + "Problems with schedule request");
+        if (activeContainer != ContainerName.SCHEDULE) {
+            if (param == "now") nowWeekScheduleCalled = false;
+            if (param == "false") nextWeekScheduleCalled = false;
+            return;
+        }
 
         if (getScheduleRequestStatus == RequestStatus.TIMEOUT) {
-
+            LinearLayout box = findViewById(R.id.scheduleList);
+            box.removeAllViews();
+            setError(ContainerName.SCHEDULE);
         }
         else if (getScheduleRequestStatus == RequestStatus.FAILED) {
-
+            LinearLayout box = findViewById(R.id.scheduleList);
+            box.removeAllViews();
+            setError(ContainerName.SCHEDULE);
         }
         else if (getScheduleRequestStatus == RequestStatus.COMPLETED && activeContainer == ContainerName.SCHEDULE) {
+            LinearLayout box = findViewById(R.id.scheduleList);
+            box.removeAllViews();
 
             int dp = (int) getResources().getDisplayMetrics().density;
 
@@ -1807,14 +1949,180 @@ public class MainActivity extends AppCompatActivity {
     }
 
     public void onGetFinalMarksRequestCompleted() {
+
         if (getFinalMarksRequestStatus == RequestStatus.CALLED) {
             getFinalMarksRequestStatus = RequestStatus.COMPLETED;
+
+            if (activeContainer != ContainerName.ITOG) {
+                itogMarksAreReady = false;
+
+                return;
+            }
+
+            if (getFinalMarksRequestStatus == RequestStatus.COMPLETED && getAllFinalMarksRequestStatus == RequestStatus.COMPLETED) {
+                LinearLayout checker = findViewById(R.id.onClickItogInfo);
+                checker.setVisibility(View.VISIBLE);
+            TextView itogLessonsSem = findViewById(R.id.itogLessonsSem);
+            itogLessonsSem.setText(finalMarksSemestr);
+
+            int dp = (int) getResources().getDisplayMetrics().density;
+            Typeface light = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_light);
+            Typeface medium = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_medium);
+            Typeface semibold = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_semibold);
+            Typeface regular = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_regular);
+
+            LinearLayout itogList = findViewById(R.id.itogList);
+            itogList.removeAllViews();
+
+            for (int i = 0; i < studentFinalMarks.length(); i++) {
+
+                RelativeLayout tmp = new RelativeLayout(getApplicationContext());
+                RelativeLayout.LayoutParams tmpLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                tmpLP.setMargins(0, 5 * dp, 0, 0);
+                tmp.setLayoutParams(tmpLP);
+                tmp.setBackgroundResource(R.drawable.forms_example);
+                itogList.addView(tmp);
+
+                LinearLayout tempBox = new LinearLayout(getApplicationContext());
+                LinearLayout.LayoutParams tempBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                tempBoxLP.setMargins(5 * dp, 15 * dp, 5 * dp, 15 * dp);
+                tempBox.setLayoutParams(tempBoxLP);
+                tempBox.setOrientation(LinearLayout.HORIZONTAL);
+                tmp.addView(tempBox);
+
+                TextView tempName = new TextView(getApplicationContext());
+                LinearLayout.LayoutParams tempNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 2);
+                tempName.setLayoutParams(tempNameLP);
+                tempName.setTextSize(12);
+                tempName.setTextColor(getResources().getColor(R.color.white));
+                tempName.setTypeface(medium);
+                try {
+                    tempName.setText(studentFinalMarks.getJSONObject(i).getString("name"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                tempBox.addView(tempName);
+
+                TextView tempAbs = new TextView(getApplicationContext());
+                LinearLayout.LayoutParams tempAbsLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                tempAbs.setLayoutParams(tempAbsLP);
+                tempAbs.setTextSize(12);
+                tempAbs.setTextColor(getResources().getColor(R.color.pinkColor));
+                tempAbs.setTypeface(semibold);
+                tempAbs.setGravity(Gravity.CENTER);
+                try {
+                    String was = studentFinalMarks.getJSONObject(i).getString("was");
+                    was = was.split(" ")[0];
+                    String all = studentFinalMarks.getJSONObject(i).getString("all");
+                    all = all.split(" ")[0];
+                    tempAbs.setText(was + "/" + all);
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                tempBox.addView(tempAbs);
+
+                TextView tempMark = new TextView(getApplicationContext());
+                LinearLayout.LayoutParams tempMarkLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                tempMark.setLayoutParams(tempMarkLP);
+                tempMark.setTextSize(12);
+                tempMark.setTextColor(getResources().getColor(R.color.pinkColor));
+                tempMark.setTypeface(semibold);
+                tempMark.setGravity(Gravity.CENTER);
+                try {
+                    tempMark.setText(studentFinalMarks.getJSONObject(i).getString("mark"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                tempBox.addView(tempMark);
+            }
+            for (int j = studentAllFinalMarks.length() - 3; j >= 0; j--) {
+
+                TextView itogSem = new TextView(getApplicationContext());
+                LinearLayout.LayoutParams itogSemLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                itogSemLP.setMargins(5 * dp, 20 * dp, 0, 0);
+                itogSem.setLayoutParams(itogSemLP);
+                itogSem.setTextColor(getResources().getColor(R.color.pinkColor));
+                itogSem.setTypeface(medium);
+                itogSem.setTextSize(12);
+                try {
+                    itogSem.setText(studentAllFinalMarks.getJSONObject(j).getString("semester"));
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+                itogList.addView(itogSem);
+
+                int len = 0;
+                try {
+                    len = studentAllFinalMarks.getJSONObject(j).getJSONArray("lessons").length();
+                } catch (JSONException e) {
+                    e.printStackTrace();
+                }
+
+                for (int i = 0; i < len; i++) {
+
+                    RelativeLayout tmp = new RelativeLayout(getApplicationContext());
+                    RelativeLayout.LayoutParams tmpLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                    tmpLP.setMargins(0, 5 * dp, 0, 0);
+                    tmp.setLayoutParams(tmpLP);
+                    tmp.setBackgroundResource(R.drawable.forms_example);
+                    itogList.addView(tmp);
+
+                    LinearLayout tempBox = new LinearLayout(getApplicationContext());
+                    LinearLayout.LayoutParams tempBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    tempBoxLP.setMargins(5 * dp, 15 * dp, 5 * dp, 15 * dp);
+                    tempBox.setLayoutParams(tempBoxLP);
+                    tempBox.setOrientation(LinearLayout.HORIZONTAL);
+                    tmp.addView(tempBox);
+
+                    TextView tempName = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 2);
+                    tempName.setLayoutParams(tempNameLP);
+                    tempName.setTextSize(12);
+                    tempName.setTextColor(getResources().getColor(R.color.white));
+                    tempName.setTypeface(medium);
+                    try {
+                        tempName.setText(studentAllFinalMarks.getJSONObject(j).getJSONArray("lessons").getJSONObject(i).getString("name"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempName);
+
+                    TextView tempAbs = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempAbsLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                    tempAbs.setLayoutParams(tempAbsLP);
+                    tempAbs.setTextSize(12);
+                    tempAbs.setTextColor(getResources().getColor(R.color.pinkColor));
+                    tempAbs.setTypeface(semibold);
+                    tempAbs.setGravity(Gravity.CENTER);
+                    tempAbs.setText("");
+                    tempBox.addView(tempAbs);
+
+                    TextView tempMark = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempMarkLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                    tempMark.setLayoutParams(tempMarkLP);
+                    tempMark.setTextSize(12);
+                    tempMark.setTextColor(getResources().getColor(R.color.pinkColor));
+                    tempMark.setTypeface(semibold);
+                    tempMark.setGravity(Gravity.CENTER);
+                    try {
+                        tempMark.setText(studentAllFinalMarks.getJSONObject(j).getJSONArray("lessons").getJSONObject(i).getString("mark"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempMark);
+                }
+            }
+        }
         }
         else if (getFinalMarksRequestStatus == RequestStatus.FAILED) {
-
+            LinearLayout box = findViewById(R.id.itogList);
+            box.removeAllViews();
+            setError(ContainerName.ITOG);
         }
         else if (getFinalMarksRequestStatus == RequestStatus.TIMEOUT) {
-
+            LinearLayout box = findViewById(R.id.itogList);
+            box.removeAllViews();
+            setError(ContainerName.ITOG);
         }
         else {
 
@@ -1825,12 +2133,179 @@ public class MainActivity extends AppCompatActivity {
 
         if (getAllFinalMarksRequestStatus == RequestStatus.CALLED) {
             getAllFinalMarksRequestStatus = RequestStatus.COMPLETED;
+
+            if (activeContainer != ContainerName.ITOG) {
+                itogMarksAreReady = false;
+                return;
+            }
+
+            if (getFinalMarksRequestStatus == RequestStatus.COMPLETED && getAllFinalMarksRequestStatus == RequestStatus.COMPLETED) {
+                LinearLayout checker = findViewById(R.id.onClickItogInfo);
+                checker.setVisibility(View.VISIBLE);
+
+                TextView itogLessonsSem = findViewById(R.id.itogLessonsSem);
+                itogLessonsSem.setText(finalMarksSemestr);
+
+                int dp = (int) getResources().getDisplayMetrics().density;
+                Typeface light = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_light);
+                Typeface medium = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_medium);
+                Typeface semibold = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_semibold);
+                Typeface regular = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_regular);
+
+                LinearLayout itogList = findViewById(R.id.itogList);
+                itogList.removeAllViews();
+
+                for (int i = 0; i < studentFinalMarks.length(); i++) {
+
+                    RelativeLayout tmp = new RelativeLayout(getApplicationContext());
+                    RelativeLayout.LayoutParams tmpLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                    tmpLP.setMargins(0, 5 * dp, 0, 0);
+                    tmp.setLayoutParams(tmpLP);
+                    tmp.setBackgroundResource(R.drawable.forms_example);
+                    itogList.addView(tmp);
+
+                    LinearLayout tempBox = new LinearLayout(getApplicationContext());
+                    LinearLayout.LayoutParams tempBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    tempBoxLP.setMargins(5 * dp, 15 * dp, 5 * dp, 15 * dp);
+                    tempBox.setLayoutParams(tempBoxLP);
+                    tempBox.setOrientation(LinearLayout.HORIZONTAL);
+                    tmp.addView(tempBox);
+
+                    TextView tempName = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 2);
+                    tempName.setLayoutParams(tempNameLP);
+                    tempName.setTextSize(12);
+                    tempName.setTextColor(getResources().getColor(R.color.white));
+                    tempName.setTypeface(medium);
+                    try {
+                        tempName.setText(studentFinalMarks.getJSONObject(i).getString("name"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempName);
+
+                    TextView tempAbs = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempAbsLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                    tempAbs.setLayoutParams(tempAbsLP);
+                    tempAbs.setTextSize(12);
+                    tempAbs.setTextColor(getResources().getColor(R.color.pinkColor));
+                    tempAbs.setTypeface(semibold);
+                    tempAbs.setGravity(Gravity.CENTER);
+                    try {
+                        String was = studentFinalMarks.getJSONObject(i).getString("was");
+                        was = was.split(" ")[0];
+                        String all = studentFinalMarks.getJSONObject(i).getString("all");
+                        all = all.split(" ")[0];
+                        tempAbs.setText(was + "/" + all);
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempAbs);
+
+                    TextView tempMark = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams tempMarkLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                    tempMark.setLayoutParams(tempMarkLP);
+                    tempMark.setTextSize(12);
+                    tempMark.setTextColor(getResources().getColor(R.color.pinkColor));
+                    tempMark.setTypeface(semibold);
+                    tempMark.setGravity(Gravity.CENTER);
+                    try {
+                        tempMark.setText(studentFinalMarks.getJSONObject(i).getString("mark"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    tempBox.addView(tempMark);
+                }
+                for (int j = studentAllFinalMarks.length() - 3; j >= 0; j--) {
+
+                    TextView itogSem = new TextView(getApplicationContext());
+                    LinearLayout.LayoutParams itogSemLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.WRAP_CONTENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                    itogSemLP.setMargins(5 * dp, 20 * dp, 0, 0);
+                    itogSem.setLayoutParams(itogSemLP);
+                    itogSem.setTextColor(getResources().getColor(R.color.pinkColor));
+                    itogSem.setTypeface(medium);
+                    itogSem.setTextSize(12);
+                    try {
+                        itogSem.setText(studentAllFinalMarks.getJSONObject(j).getString("semester"));
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+                    itogList.addView(itogSem);
+
+                    int len = 0;
+                    try {
+                        len = studentAllFinalMarks.getJSONObject(j).getJSONArray("lessons").length();
+                    } catch (JSONException e) {
+                        e.printStackTrace();
+                    }
+
+                    for (int i = 0; i < len; i++) {
+
+                        RelativeLayout tmp = new RelativeLayout(getApplicationContext());
+                        RelativeLayout.LayoutParams tmpLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
+                        tmpLP.setMargins(0, 5 * dp, 0, 0);
+                        tmp.setLayoutParams(tmpLP);
+                        tmp.setBackgroundResource(R.drawable.forms_example);
+                        itogList.addView(tmp);
+
+                        LinearLayout tempBox = new LinearLayout(getApplicationContext());
+                        LinearLayout.LayoutParams tempBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT);
+                        tempBoxLP.setMargins(5 * dp, 15 * dp, 5 * dp, 15 * dp);
+                        tempBox.setLayoutParams(tempBoxLP);
+                        tempBox.setOrientation(LinearLayout.HORIZONTAL);
+                        tmp.addView(tempBox);
+
+                        TextView tempName = new TextView(getApplicationContext());
+                        LinearLayout.LayoutParams tempNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 2);
+                        tempName.setLayoutParams(tempNameLP);
+                        tempName.setTextSize(12);
+                        tempName.setTextColor(getResources().getColor(R.color.white));
+                        tempName.setTypeface(medium);
+                        try {
+                            tempName.setText(studentAllFinalMarks.getJSONObject(j).getJSONArray("lessons").getJSONObject(i).getString("name"));
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        tempBox.addView(tempName);
+
+                        TextView tempAbs = new TextView(getApplicationContext());
+                        LinearLayout.LayoutParams tempAbsLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                        tempAbs.setLayoutParams(tempAbsLP);
+                        tempAbs.setTextSize(12);
+                        tempAbs.setTextColor(getResources().getColor(R.color.pinkColor));
+                        tempAbs.setTypeface(semibold);
+                        tempAbs.setGravity(Gravity.CENTER);
+                        tempAbs.setText("");
+                        tempBox.addView(tempAbs);
+
+                        TextView tempMark = new TextView(getApplicationContext());
+                        LinearLayout.LayoutParams tempMarkLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
+                        tempMark.setLayoutParams(tempMarkLP);
+                        tempMark.setTextSize(12);
+                        tempMark.setTextColor(getResources().getColor(R.color.pinkColor));
+                        tempMark.setTypeface(semibold);
+                        tempMark.setGravity(Gravity.CENTER);
+                        try {
+                            tempMark.setText(studentAllFinalMarks.getJSONObject(j).getJSONArray("lessons").getJSONObject(i).getString("mark"));
+                        } catch (JSONException e) {
+                            e.printStackTrace();
+                        }
+                        tempBox.addView(tempMark);
+                    }
+                }
+            }
         }
         else if (getAllFinalMarksRequestStatus == RequestStatus.FAILED) {
-
+            LinearLayout box = findViewById(R.id.itogList);
+            box.removeAllViews();
+            setError(ContainerName.ITOG);
+            itogMarksAreReady = false;
         }
         else if (getAllFinalMarksRequestStatus == RequestStatus.TIMEOUT) {
-
+            LinearLayout box = findViewById(R.id.itogList);
+            box.removeAllViews();
+            setError(ContainerName.ITOG);
+            itogMarksAreReady = false;
         }
         else {
 
@@ -1844,6 +2319,9 @@ public class MainActivity extends AppCompatActivity {
             try {
                  ratingInfo = new JSONObject(response);
                  System.out.println(ratingInfo);
+
+                 ratingPlace.setText(ratingInfo.getString("studentPosition"));
+                 ratingCount.setText("/" + ratingInfo.getString("studentsCount") + " участников");
             } catch (JSONException e) {
 
             }
@@ -1862,10 +2340,25 @@ public class MainActivity extends AppCompatActivity {
     // Сами асинхронные запросы
 
     // [name, password]
-    class loginRequest extends AsyncTask<String[], Void, String[]> {
+    class loginRequest extends AsyncTask<String[], String, String[]>  {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//            loadingLog("Вход в аккаунт");
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Вход в аккаунт");
+        }
 
         @Override
         protected String[] doInBackground(String[]... params) { // params[0][0] - name, params[0][1] - password
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String cookie = "";
 
@@ -1907,11 +2400,22 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // [year, month]
-    class getStudentMainDataRequest extends AsyncTask<String[], Void, String> {
+    class getStudentMainDataRequest extends AsyncTask<String[], String, String> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о предметах и преподавателях");
+        }
 
         protected String doInBackground(String[]... params) { // params[0][0] - year, params[0][1] - month
 
-            System.out.println("Student main data request called");
+            publishProgress("");
 
             HttpURLConnection urlConnection = null;
             String responseBody = "";
@@ -1959,9 +2463,18 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // [lessonId]
-    class getExercisesByLessonRequest extends AsyncTask <String[], Void, String[]> {
+    class getExercisesByLessonRequest extends AsyncTask <String[], String, String[]> {
+
+//        @Override
+//        protected void onProgressUpdate(String... values) {
+//            super.onProgressUpdate(values);
+//            loadingLog("Получение данных о парах");
+//        }
 
         protected String[] doInBackground(String[]... params) { // params[0][0] - lesson_id (String)
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -1995,9 +2508,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // [date <yyyy-mm-dd>]
-    class getExercisesByDayRequest extends AsyncTask <String[], Void, String> {
+    class getExercisesByDayRequest extends AsyncTask <String[], String, String> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о парах за сегодня");
+        }
 
         protected String doInBackground(String[]... params) { // params[0][0] - date <yyyy-mm-dd>
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -2030,9 +2557,23 @@ public class MainActivity extends AppCompatActivity {
     }
 
     // [postsCount]
-    class getVKWallPostsRequest extends AsyncTask <String[], Void, String> { // params[0][0] - posts count
+    class getVKWallPostsRequest extends AsyncTask <String[], String, String> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение новостей");
+        }
 
         protected String doInBackground(String[]... params) {
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -2067,9 +2608,23 @@ public class MainActivity extends AppCompatActivity {
 
     Bitmap bitmap; // картинка профиля
 
-    class getStudentProfileDataRequest extends AsyncTask<Void, Void, String[]> { //FIO, GROUP
+    class getStudentProfileDataRequest extends AsyncTask<Void, String, String[]> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о студенте");
+        }
 
         protected String[] doInBackground(Void... params) {
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
             Document html = new Document(responseBody);
@@ -2158,9 +2713,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    class getScheduleRequest extends AsyncTask<String[], Void, String> { // Void на самом деле
+    class getScheduleRequest extends AsyncTask<String[], String, String> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о расписании");
+        }
 
         protected String doInBackground(String[]... params) { // now next
+
+            publishProgress("");
+
             URL url;
             HttpURLConnection urlConnection = null;
             String responseBody = "";
@@ -2213,6 +2782,7 @@ public class MainActivity extends AppCompatActivity {
             }
 
             System.out.println("GetScheduleParsing Success!");
+                        getScheduleRequestStatus = RequestStatus.COMPLETED;
 
             JSONArray scheduleRoot = new JSONArray();
 
@@ -2330,14 +2900,27 @@ public class MainActivity extends AppCompatActivity {
 
         protected void onPostExecute(String result) {
             super.onPostExecute(result);
-            getScheduleRequestStatus = RequestStatus.COMPLETED;
             onGetScheduleRequestCompleted(result, "");
         }
     }
 
-    class getStudentStatsRequest extends AsyncTask<Void, Void, String[]> { // Void на самом деле
+    class getStudentStatsRequest extends AsyncTask<Void, String, String[]> { // Void на самом деле
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных об успеваемоти студента");
+        }
 
         protected String[] doInBackground(Void ...params) {
+
+            publishProgress("");
+
             String statsMidMark = "";
             String statsDebtsCount = "";
             String statsPercentageOfVisits = "";
@@ -2396,9 +2979,24 @@ public class MainActivity extends AppCompatActivity {
 
     String finalMarksSemestr = "";
 
-    class getFinalMarksRequest extends AsyncTask<Void, Void, Void> {
+    class getFinalMarksRequest extends AsyncTask<Void, String, Void> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//            loadingLog("Получение данных об успеваемоти студента");
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о последних итоговых оценках");
+        }
 
         protected Void doInBackground(Void... params) {
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
             Document html = new Document(responseBody);
@@ -2488,9 +3086,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    class getAllFinalMarksRequest extends AsyncTask<Void, Void, Void> {
+    class getAllFinalMarksRequest extends AsyncTask<Void, String, Void> {
+
+        @Override
+        protected void onPreExecute() {
+            super.onPreExecute();
+        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о всех итоговых оценках");
+        }
 
         protected Void doInBackground(Void... params) {
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
             Document html = new Document(responseBody);
@@ -2534,7 +3146,7 @@ public class MainActivity extends AppCompatActivity {
 
                             name = tds.get(0).text();
                             hours = tds.get(1).text();
-                            mark = trs.get(2).text();
+                            mark = tds.get(2).text();
 
                             JSONObject lesson = new JSONObject();
                             lesson.put("name", name);
@@ -2550,8 +3162,8 @@ public class MainActivity extends AppCompatActivity {
 
                 }
 
-
-//                System.out.println(allMarks.toString(2));
+                studentAllFinalMarks = allMarks;
+                System.out.println(allMarks.toString());
 
 //                studentFinalMarks = array;
 
@@ -2581,9 +3193,23 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    class RatingRequest extends AsyncTask<String[], Void, String> {
+    class RatingRequest extends AsyncTask<String[], String, String> {
+
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о рейтинге");
+        }
 
         protected String doInBackground(String[]... params) {
+
+            publishProgress("");
+
             HttpURLConnection urlConnection = null;
             String responseBody = "";
 
@@ -2689,6 +3315,8 @@ public class MainActivity extends AppCompatActivity {
 
 
     public void setContainer(ContainerName newContainer) { // функция обновления активного контейнера
+
+        System.out.println("From: " + activeContainer);
 
         switch (activeContainer) {
             case PROFILE: {
@@ -2857,83 +3485,10 @@ public class MainActivity extends AppCompatActivity {
                 lessonsNavText.setShadowLayer(5,0,0,getResources().getColor(R.color.white));
                 main.addView(itogScreen);
                 activeContainer = ContainerName.ITOG;
-                TextView itogLessonsSem = findViewById(R.id.itogLessonsSem);
-                itogLessonsSem.setText(finalMarksSemestr);
-
-                int dp = (int) getResources().getDisplayMetrics().density;
-                Typeface light = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_light);
-                Typeface medium = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_medium);
-                Typeface semibold = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_semibold);
-                Typeface regular = ResourcesCompat.getFont(getApplicationContext(), R.font.montserrat_regular);
-
-                LinearLayout itogList = findViewById(R.id.itogList);
-                itogList.removeAllViews();
-
-                for (int i = 0; i < studentFinalMarks.length(); i++) {
-
-                    RelativeLayout tmp = new RelativeLayout(getApplicationContext());
-                    RelativeLayout.LayoutParams tmpLP = new RelativeLayout.LayoutParams(RelativeLayout.LayoutParams.MATCH_PARENT, RelativeLayout.LayoutParams.WRAP_CONTENT);
-                    tmpLP.setMargins(0, 5*dp,0,0);
-                    tmp.setLayoutParams(tmpLP);
-                    tmp.setBackgroundResource(R.drawable.forms_example);
-                    itogList.addView(tmp);
-
-                    LinearLayout tempBox = new LinearLayout(getApplicationContext());
-                    LinearLayout.LayoutParams tempBoxLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT,LinearLayout.LayoutParams.WRAP_CONTENT);
-                    tempBoxLP.setMargins(5*dp,15*dp,5*dp,15*dp);
-                    tempBox.setLayoutParams(tempBoxLP);
-                    tempBox.setOrientation(LinearLayout.HORIZONTAL);
-                    tmp.addView(tempBox);
-
-                    TextView tempName = new TextView(getApplicationContext());
-                    LinearLayout.LayoutParams tempNameLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.WRAP_CONTENT, 2);
-                    tempName.setLayoutParams(tempNameLP);
-                    tempName.setTextSize(12);
-                    tempName.setTextColor(getResources().getColor(R.color.white));
-                    tempName.setTypeface(medium);
-                    try {
-                        tempName.setText(studentFinalMarks.getJSONObject(i).getString("name"));
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    tempBox.addView(tempName);
-
-                    TextView tempAbs = new TextView(getApplicationContext());
-                    LinearLayout.LayoutParams tempAbsLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
-                    tempAbs.setLayoutParams(tempAbsLP);
-                    tempAbs.setTextSize(12);
-                    tempAbs.setTextColor(getResources().getColor(R.color.pinkColor));
-                    tempAbs.setTypeface(semibold);
-                    tempAbs.setGravity(Gravity.CENTER);
-                    try {
-                        String was = studentFinalMarks.getJSONObject(i).getString("was");
-                        was = was.split(" ")[0];
-                        String all = studentFinalMarks.getJSONObject(i).getString("all");
-                        all = all.split(" ")[0];
-                        tempAbs.setText(was + "/" + all);
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    tempBox.addView(tempAbs);
-
-                    TextView tempMark = new TextView(getApplicationContext());
-                    LinearLayout.LayoutParams tempMarkLP = new LinearLayout.LayoutParams(LinearLayout.LayoutParams.MATCH_PARENT, LinearLayout.LayoutParams.MATCH_PARENT, 3);
-                    tempMark.setLayoutParams(tempMarkLP);
-                    tempMark.setTextSize(12);
-                    tempMark.setTextColor(getResources().getColor(R.color.pinkColor));
-                    tempMark.setTypeface(semibold);
-                    tempMark.setGravity(Gravity.CENTER);
-                    try {
-                        tempMark.setText(studentFinalMarks.getJSONObject(i).getString("mark"));
-                    } catch (JSONException e) {
-                        e.printStackTrace();
-                    }
-                    tempBox.addView(tempMark);
-                }
-
                 break;
             }
         }
+        System.out.println("To: " + activeContainer);
     }
 
     public void setLoadingToList(ContainerName neededContainer) { // функция обновления активного контейнера
@@ -2954,6 +3509,11 @@ public class MainActivity extends AppCompatActivity {
             case NOTIFICATION: {
                 LinearLayout box = findViewById(R.id.notificationList);
                 box.removeAllViews();
+                box.addView(loadingScreen);
+                break;
+            }
+            case ITOG: {
+                LinearLayout box = findViewById(R.id.itogList);
                 box.addView(loadingScreen);
                 break;
             }
