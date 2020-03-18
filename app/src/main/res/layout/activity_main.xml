@@ -14,12 +14,13 @@
         android:layout_width="match_parent"
         android:layout_height="match_parent"
         android:orientation="vertical"
-        tools:visibility="visible">
+        tools:visibility="invisible">
 
 
         <WebView
             android:layout_width="200dp"
             android:layout_height="wrap_content"
+            android:scrollbars="none"
             android:layout_centerInParent="true"
             android:id="@+id/loadingWebView">
 
@@ -63,6 +64,7 @@
             android:layout_width="match_parent"
             android:layout_height="match_parent"
             android:overScrollMode="never"
+            android:scrollbars="none"
             >
 
         <LinearLayout
@@ -196,6 +198,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never">
 
             <LinearLayout
@@ -317,6 +320,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never">
 
             <LinearLayout
@@ -456,14 +460,30 @@
 
 
 
-        <TextView
-            android:id="@+id/errorText"
-            android:layout_width="wrap_content"
+        <ImageView
+            android:layout_width="match_parent"
             android:layout_height="wrap_content"
+            android:layout_marginLeft="50dp"
+            android:layout_marginRight="50dp"
+            android:layout_centerInParent="true"
+            android:src="@drawable/error_pink">
+
+        </ImageView>
+
+        <TextView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginLeft="50dp"
+            android:layout_marginRight="50dp"
+            android:layout_marginBottom="150dp"
             android:layout_centerHorizontal="true"
-            android:layout_centerVertical="true"
+            android:layout_alignParentBottom="true"
             android:textColor="@color/white"
-            android:text="this is error" />
+            android:fontFamily="@font/montserrat_light"
+            android:textSize="14dp"
+            android:text="Попробуйте переподключиться к сети или перезапустить приложение"
+            android:gravity="center">
+        </TextView>
     </RelativeLayout>
 
     <RelativeLayout
@@ -572,6 +592,7 @@
         android:layout_marginTop="60dp"
         android:layout_marginBottom="60dp"
         android:overScrollMode="never"
+        android:scrollbars="none"
         tools:visibility="invisible">
 
         <LinearLayout
@@ -584,7 +605,8 @@
 
             <RelativeLayout
                 android:layout_width="match_parent"
-                android:layout_height="wrap_content">
+                android:layout_height="wrap_content"
+                android:id="@+id/profileFirstAnimated">
 
                 <androidx.cardview.widget.CardView
                     android:layout_width="100dp"
@@ -629,50 +651,57 @@
                         android:layout_weight="3"
                         android:background="@drawable/forms_example">
 
-                        <TextView
-                            android:id="@+id/ratePlace"
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_centerVertical="true"
-                            android:layout_marginLeft="15dp"
-                            android:fontFamily="@font/montserrat_regular"
-                            android:text="1"
-                            android:textColor="@color/pinkColor"
-                            android:textSize="30dp">
+                            <TextView
+                                android:layout_marginLeft="5dp"
+                                android:layout_marginTop="5dp"
+                                android:id="@+id/ratePlace"
+                                android:layout_width="35dp"
+                                android:layout_height="wrap_content"
+                                android:fontFamily="@font/montserrat_semibold"
+                                android:text="123"
+                                android:gravity="center_horizontal"
+                                android:textColor="@color/pinkColor"
+                                android:textSize="20dp">
 
-                        </TextView>
+                            </TextView>
 
-                        <TextView
-                            android:layout_width="wrap_content"
-                            android:layout_height="wrap_content"
-                            android:layout_alignParentRight="true"
-                            android:layout_marginTop="7dp"
-                            android:layout_marginLeft="25dp"
-                            android:layout_marginRight="10dp"
-                            android:fontFamily="@font/montserrat_regular"
-                            android:gravity="left"
-                            android:text="рейтинг курса"
-                            android:textColor="@color/pinkColor"
-                            android:textSize="10dp">
+                            <TextView
+                                android:layout_marginRight="5dp"
+                                android:layout_marginTop="6dp"
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_marginLeft="45dp"
+                                android:fontFamily="@font/montserrat_light"
+                                android:text="место на потоке"
+                                android:textColor="@color/pinkColor"
+                                android:textSize="10dp">
 
-                        </TextView>
-
+                            </TextView>
                         <TextView
                             android:id="@+id/rateCount"
-                            android:layout_width="wrap_content"
+                            android:layout_width="35dp"
                             android:layout_height="wrap_content"
-                            android:layout_alignParentRight="true"
                             android:layout_alignParentBottom="true"
-                            android:layout_marginBottom="7dp"
-                            android:layout_marginLeft="25dp"
-                            android:layout_marginRight="10dp"
-                            android:fontFamily="@font/montserrat_regular"
-                            android:gravity="left"
-                            android:text="/123 участников"
-                            android:textColor="@color/pinkColor"
-                            android:textSize="10dp">
+                            android:layout_marginLeft="5dp"
+                            android:layout_marginBottom="1dp"
+                            android:fontFamily="@font/montserrat_light"
+                            android:gravity="center_horizontal"
+                            android:text="123"
+                            android:textColor="@color/greyColor"
+                            android:textSize="12dp">
 
                         </TextView>
+                            <TextView
+                                android:layout_width="wrap_content"
+                                android:layout_height="wrap_content"
+                                android:layout_alignParentBottom="true"
+                                android:layout_marginLeft="45dp"
+                                android:layout_marginRight="5dp"
+                                android:layout_marginBottom="3dp"
+                                android:fontFamily="@font/montserrat_light"
+                                android:text="участников"
+                                android:textColor="@color/greyColor"
+                                android:textSize="10dp" />
                     </RelativeLayout>
 
                     <RelativeLayout
@@ -698,6 +727,7 @@
             </RelativeLayout>
 
             <LinearLayout
+                android:id="@+id/profileSecondAnimated"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="15dp"
@@ -836,6 +866,7 @@
 
 
             <TextView
+                android:id="@+id/todayExercisesText"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
                 android:layout_marginLeft="15dp"
@@ -857,6 +888,30 @@
                 android:background="@drawable/forms_example"
                 android:orientation="vertical"
                 android:paddingBottom="10dp">
+
+<!--                <ImageView-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:layout_marginTop="20dp"-->
+<!--                    android:layout_marginLeft="30dp"-->
+<!--                    android:layout_marginRight="30dp"-->
+<!--                    android:layout_marginBottom="10dp"-->
+<!--                    android:src="@drawable/shutdown">-->
+<!--                </ImageView>-->
+
+<!--                <TextView-->
+<!--                    android:layout_width="match_parent"-->
+<!--                    android:layout_height="wrap_content"-->
+<!--                    android:layout_marginBottom="10dp"-->
+<!--                    android:layout_marginRight="30dp"-->
+<!--                    android:layout_marginLeft="30dp"-->
+<!--                    android:fontFamily="@font/montserrat_light"-->
+<!--                    android:textColor="@color/greyColor"-->
+<!--                    android:textSize="14dp"-->
+<!--                    android:text="Пар не было, можно отдыхать"-->
+<!--                    android:gravity="center">-->
+
+<!--                </TextView>-->
 
 <!--                            <LinearLayout-->
 <!--                                android:layout_height="wrap_content"-->
@@ -1053,6 +1108,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never"
             >
 
@@ -1232,6 +1288,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never">
 
             <LinearLayout
@@ -1512,6 +1569,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never">
 
             <LinearLayout
@@ -1531,7 +1589,6 @@
                     android:textSize="16dp"></TextView>
 
                 <LinearLayout
-                    android:id="@+id/lessonsList"
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content"
                     android:orientation="vertical">
@@ -1578,48 +1635,53 @@
                                             android:textColor="@color/greyColor" />
                                     </RelativeLayout>
 
-                    <!--                    <TextView-->
-                    <!--                        android:layout_width="wrap_content"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:layout_marginTop="15dp"-->
-                    <!--                        android:layout_marginLeft="20dp"-->
-                    <!--                        android:text="3 семестр"-->
-                    <!--                        android:textSize="12dp"-->
-                    <!--                        android:textColor="@color/pinkColor"-->
-                    <!--                        android:fontFamily="@font/montserrat_medium">-->
-                    <!--                    </TextView>-->
 
-                    <!--                    <RelativeLayout-->
-                    <!--                    android:layout_width="match_parent"-->
-                    <!--                    android:layout_height="wrap_content"-->
-                    <!--                        android:layout_marginTop="5dp"-->
-                    <!--                    android:background="@drawable/forms_example">-->
-                    <!--                    <TextView-->
-                    <!--                        android:layout_width="wrap_content"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:layout_marginLeft="20dp"-->
-                    <!--                        android:layout_marginTop="15dp"-->
-                    <!--                        android:layout_marginBottom="15dp"-->
-                    <!--                        android:gravity="center"-->
-                    <!--                        android:textSize="11dp"-->
-                    <!--                        android:text="дискретная мат-ка с элементами мат. логики"-->
-                    <!--                        android:fontFamily="@font/montserrat_medium"-->
-                    <!--                        android:textColor="@color/white">-->
-                    <!--                    </TextView>-->
-                    <!--                    <TextView-->
-                    <!--                        android:layout_width="wrap_content"-->
-                    <!--                        android:layout_height="wrap_content"-->
-                    <!--                        android:layout_marginRight="20dp"-->
-                    <!--                        android:gravity="center"-->
-                    <!--                        android:textSize="16dp"-->
-                    <!--                        android:text=">"-->
-                    <!--                        android:fontFamily="@font/montserrat_medium"-->
-                    <!--                        android:layout_alignParentRight="true"-->
-                    <!--                        android:layout_centerVertical="true"-->
-                    <!--                        android:textColor="@color/greyColor" />-->
-                    <!--                </RelativeLayout>-->
+                    <LinearLayout
+                        android:id="@+id/lessonsList"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:orientation="vertical">
+                        <!--                    <TextView-->
+                        <!--                        android:layout_width="wrap_content"-->
+                        <!--                        android:layout_height="wrap_content"-->
+                        <!--                        android:layout_marginTop="15dp"-->
+                        <!--                        android:layout_marginLeft="20dp"-->
+                        <!--                        android:text="3 семестр"-->
+                        <!--                        android:textSize="12dp"-->
+                        <!--                        android:textColor="@color/pinkColor"-->
+                        <!--                        android:fontFamily="@font/montserrat_medium">-->
+                        <!--                    </TextView>-->
 
-
+                        <!--                    <RelativeLayout-->
+                        <!--                    android:layout_width="match_parent"-->
+                        <!--                    android:layout_height="wrap_content"-->
+                        <!--                        android:layout_marginTop="5dp"-->
+                        <!--                    android:background="@drawable/forms_example">-->
+                        <!--                    <TextView-->
+                        <!--                        android:layout_width="wrap_content"-->
+                        <!--                        android:layout_height="wrap_content"-->
+                        <!--                        android:layout_marginLeft="20dp"-->
+                        <!--                        android:layout_marginTop="15dp"-->
+                        <!--                        android:layout_marginBottom="15dp"-->
+                        <!--                        android:gravity="center"-->
+                        <!--                        android:textSize="11dp"-->
+                        <!--                        android:text="дискретная мат-ка с элементами мат. логики"-->
+                        <!--                        android:fontFamily="@font/montserrat_medium"-->
+                        <!--                        android:textColor="@color/white">-->
+                        <!--                    </TextView>-->
+                        <!--                    <TextView-->
+                        <!--                        android:layout_width="wrap_content"-->
+                        <!--                        android:layout_height="wrap_content"-->
+                        <!--                        android:layout_marginRight="20dp"-->
+                        <!--                        android:gravity="center"-->
+                        <!--                        android:textSize="16dp"-->
+                        <!--                        android:text=">"-->
+                        <!--                        android:fontFamily="@font/montserrat_medium"-->
+                        <!--                        android:layout_alignParentRight="true"-->
+                        <!--                        android:layout_centerVertical="true"-->
+                        <!--                        android:textColor="@color/greyColor" />-->
+                        <!--                </RelativeLayout>-->
+                    </LinearLayout>
                 </LinearLayout>
 
             </LinearLayout>
@@ -1637,6 +1699,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never">
 
             <LinearLayout
@@ -1848,6 +1911,7 @@
         <ScrollView
             android:layout_width="match_parent"
             android:layout_height="match_parent"
+            android:scrollbars="none"
             android:overScrollMode="never">
 
             <LinearLayout
@@ -1956,20 +2020,40 @@
                 android:gravity="center" />
         </LinearLayout>
 
-        <TextView
-            android:fontFamily="@font/montserrat_regular"
-            android:layout_marginRight="10dp"
-            android:layout_marginLeft="15dp"
-            android:layout_marginTop="8dp"
-            android:layout_marginBottom="8dp"
-            android:gravity="center_vertical"
-            android:background="@drawable/navigation_input"
-            android:textColor="@color/pinkColor"
-            android:paddingLeft="15dp"
-            android:layout_width="fill_parent"
+<!--        <TextView-->
+<!--            android:fontFamily="@font/montserrat_regular"-->
+<!--            android:layout_marginRight="10dp"-->
+<!--            android:layout_marginLeft="15dp"-->
+<!--            android:layout_marginTop="8dp"-->
+<!--            android:layout_marginBottom="8dp"-->
+<!--            android:gravity="center_vertical"-->
+<!--            android:background="@drawable/navigation_input"-->
+<!--            android:textColor="@color/pinkColor"-->
+<!--            android:paddingLeft="15dp"-->
+<!--            android:layout_width="fill_parent"-->
+<!--            android:layout_height="match_parent"-->
+<!--            android:text="@string/navigationProfile"-->
+<!--            android:textSize="18dp"/>-->
+        <com.google.android.material.textfield.TextInputLayout
+            android:layout_width="match_parent"
             android:layout_height="match_parent"
-            android:text="@string/navigationProfile"
-            android:textSize="18dp"/>
+            android:layout_marginRight="10dp"
+            android:layout_marginLeft="15dp">
+
+
+            <com.google.android.material.textfield.TextInputEditText
+                android:id="@+id/navigationInput"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:layout_marginTop="8dp"
+                android:layout_marginBottom="8dp"
+                android:paddingLeft="15dp"
+                android:text="User.Profile"
+                android:textSize="18dp"
+                android:textColor="@color/pinkColor"
+                android:fontFamily="@font/montserrat_regular"
+                android:background="@drawable/navigation_input"/>
+        </com.google.android.material.textfield.TextInputLayout>
     </LinearLayout>
 
 
