@@ -3,6 +3,7 @@ package com.example.spoconnection;
 
 import androidx.appcompat.app.AppCompatActivity;
 import androidx.core.content.res.ResourcesCompat;
+import androidx.core.view.GestureDetectorCompat;
 import androidx.fragment.app.DialogFragment;
 
 import android.app.AlertDialog;
@@ -22,9 +23,11 @@ import android.graphics.drawable.GradientDrawable;
 import android.os.Bundle;
 import android.os.AsyncTask;
 
+import android.view.GestureDetector;
 import android.view.Gravity;
 import android.view.KeyEvent;
 import android.view.LayoutInflater;
+import android.view.MotionEvent;
 import android.view.View;
 import android.view.Window;
 import android.view.WindowManager;
@@ -153,6 +156,8 @@ public class MainActivity extends AppCompatActivity {
 
     public Bitmap studentAvatarBitmap;
 
+    public JSONArray studentAchievements;
+
 
     LoginRequest loginRequest;
     GetStudentMainDataRequest mainDataRequest;
@@ -168,6 +173,7 @@ public class MainActivity extends AppCompatActivity {
     GetScheduleOfGroupRequest scheduleOfGroupRequest;
     GetScheduleOfTeacherRequest scheduleOfTeacherRequest;
     GetScheduleInfoRequest scheduleInfoRequest;
+    GetStudentAchievementsRequest achievementsRequest;
 
     // Handlers для проверки на выполнение запроса
 
@@ -194,6 +200,7 @@ public class MainActivity extends AppCompatActivity {
     RequestStatus getScheduleOfGroupRequestStatus;
     RequestStatus getScheduleOfTeacherRequestStatus;
     RequestStatus getScheduleInfoRequestStatus;
+    RequestStatus getStudentAchievementsRequestStatus;
 
 
     // Переменная, чтобы buildFrontend не вызвался дважды (и после getMainData и после getByDay)
@@ -295,11 +302,69 @@ public class MainActivity extends AppCompatActivity {
 
 
 
+//    private class MyGestureListener extends GestureDetector.SimpleOnGestureListener{
+//        @Override
+//        public boolean onDown(MotionEvent e) {
+//            return true;
+//        }
+//        @Override
+//        public boolean onFling(MotionEvent e1, MotionEvent e2, float velocityX, float velocityY){
+//            System.out.println(activeContainer);
+//            if (e2.getX() - e1.getX() > 100) {
+//                switch (activeContainer) {
+//                    case SETTINGS: {
+//                        setContainer(ContainerName.LESSONS);
+//                        break;
+//                    }
+//                    case SCHEDULE: {
+//                        setContainer(ContainerName.HOME);
+//                        break;
+//                    }
+//                    case PROFILE: {
+//                        setContainer(ContainerName.SCHEDULE);
+//                        break;
+//                    }
+//                    case LESSONS: {
+//                        setContainer(ContainerName.PROFILE);
+//                        break;
+//                    }
+//                }
+//                System.out.println("left to right");
+//            }
+//            if (e1.getX() - e2.getX() > 100) {
+//                switch (activeContainer) {
+//                    case HOME: {
+//                        setContainer(ContainerName.SCHEDULE);
+//                        break;
+//                    }
+//                    case SCHEDULE: {
+//                        setContainer(ContainerName.PROFILE);
+//                        break;
+//                    }
+//                    case PROFILE: {
+//                        setContainer(ContainerName.LESSONS);
+//                        break;
+//                    }
+//                    case LESSONS: {
+//                        setContainer(ContainerName.SETTINGS);
+//                        break;
+//                    }
+//                }
+//                System.out.println("right to left");
+//            }
+//            return false;
+//        }
+//    }
+
+
+
     @Override
     protected void onCreate(Bundle savedInstanceState) {
 
+        setTheme(R.style.AppTheme);
         super.onCreate(savedInstanceState);
         setContentView(R.layout.activity_main);
+
 
 //        System.out.println('\n');
 
@@ -338,6 +403,102 @@ public class MainActivity extends AppCompatActivity {
         notList = findViewById(R.id.notificationList);
         itogList = findViewById(R.id.itogList);
         teachersList = findViewById(R.id.teachersList);
+
+        // свайпы
+
+//        final GestureDetectorCompat lSwipeDetector = new GestureDetectorCompat(this, new MyGestureListener());
+//
+//        main.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        profileScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        navigation.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        homeScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        scheduleScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        teacherScheduleScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        lessonsScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//
+//        lessonsInformationScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//        userHelpScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//        notificationListScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//        settingsScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//        itogScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//        backConnectScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
+//        teachersScreen.setOnTouchListener(new View.OnTouchListener() {
+//            @Override
+//            public boolean onTouch(View v, MotionEvent event) {
+//                return lSwipeDetector.onTouchEvent(event);
+//            }
+//        });
 
         // webView
 
@@ -585,7 +746,18 @@ public class MainActivity extends AppCompatActivity {
                     LinearLayout scheduleList = findViewById(R.id.scheduleList);
                     scheduleList.removeAllViews();
                     setLoadingToList(ContainerName.SCHEDULE);
-                    onGetScheduleOfGroupRequestCompleted("now", "");
+                    Timer timer = new Timer();
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            MainActivity.this.runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    onGetScheduleOfGroupRequestCompleted("now", "");
+                                }
+                            });
+                        }
+                    }, 200);
                 }
             }
         });
@@ -641,7 +813,18 @@ public class MainActivity extends AppCompatActivity {
                     LinearLayout scheduleList = findViewById(R.id.scheduleList);
                     scheduleList.removeAllViews();
                     setLoadingToList(ContainerName.SCHEDULE);
-                    onGetScheduleOfGroupRequestCompleted("next", "");
+                    Timer timer = new Timer();
+                    timer.schedule(new TimerTask() {
+                        @Override
+                        public void run() {
+                            MainActivity.this.runOnUiThread(new Runnable() {
+                                @Override
+                                public void run() {
+                                    onGetScheduleOfGroupRequestCompleted("next", "");
+                                }
+                            });
+                        }
+                    }, 200);
                 }
             }
         });
@@ -717,9 +900,13 @@ public class MainActivity extends AppCompatActivity {
         homeNotificationLink.setOnClickListener(new View.OnClickListener() {
             @Override
             public void onClick(View v) {
-                setContainer(ContainerName.NOTIFICATION);
                 sendGetVKWallPostsRequest(new String[] {"40"});
-                setLoadingToList(ContainerName.NOTIFICATION);
+                setContainer(ContainerName.NOTIFICATION);
+                if (activeContainer == ContainerName.NOTIFICATION) {
+                    LinearLayout box = findViewById(R.id.notificationList);
+                    box.removeAllViews();
+                    setLoadingToList(ContainerName.NOTIFICATION);
+                }
             }
         });
         homeTeachersLink.setOnClickListener(new View.OnClickListener() {
@@ -829,13 +1016,13 @@ public class MainActivity extends AppCompatActivity {
             setContainer(ContainerName.SETTINGS);
             return;
         } else if (activeContainer == ContainerName.TEACHERSCHEDULE) {
-            setContainer(ContainerName.SCHEDULE);
+            setContainer(ContainerName.TEACHERS);
             return;
         } else if (activeContainer == ContainerName.ITOG) {
             setContainer(ContainerName.LESSONS);
             return;
         } else if (activeContainer == ContainerName.TEACHERS) {
-            setContainer(ContainerName.SCHEDULE);
+            setContainer(ContainerName.HOME);
             return;
         } else {
             setContainer(ContainerName.PROFILE);
@@ -1035,11 +1222,12 @@ public class MainActivity extends AppCompatActivity {
             }
         });
 
-//        sendGetScheduleOfTeacherRequest(new String[] {"now", "t55"});
-
 
         // долги, посещения, средний балл
         sendGetStudentStatsRequest();
+
+        // достижения
+        sendGetStudentAchievementsRequest();
 
         // если необходимо, парсим страницу с профилем
         if (getStudentProfileDataRequestStatus != RequestStatus.COMPLETED)
@@ -1058,26 +1246,28 @@ public class MainActivity extends AppCompatActivity {
     // Когда отпраили все запросы для входа в акаунт
     public void afterFirstRequests() {
 
-//        System.out.println("+--------");
-//        System.out.println("| Stats request: " + getStudentStatsRequestStatus);
-//        System.out.println("| Final marks request: " + getFinalMarksRequestStatus);
-//        System.out.println("| All final marks request: " + getAllFinalMarksRequestStatus);
-//        System.out.println("| Main data request: " + getStudentMainDataRequestStatus);
-//        System.out.println("| Student profile data request: " + getStudentProfileDataRequestStatus);
-//        System.out.println("| Rating request: " + ratingRequestStatus);
-//        System.out.println("| Exercises by day request: " + getExercisesByDayRequestStatus);
-//        System.out.println("+--------");
+        System.out.println("+--------");
+        System.out.println("| Stats request: " + getStudentStatsRequestStatus);
+        System.out.println("| Final marks request: " + getFinalMarksRequestStatus);
+        System.out.println("| All final marks request: " + getAllFinalMarksRequestStatus);
+        System.out.println("| Main data request: " + getStudentMainDataRequestStatus);
+        System.out.println("| Student profile data request: " + getStudentProfileDataRequestStatus);
+        System.out.println("| Rating request: " + ratingRequestStatus);
+        System.out.println("| Achievements request: " + getStudentAchievementsRequestStatus);
+        System.out.println("| Exercises by day request: " + getExercisesByDayRequestStatus);
+        System.out.println("+--------");
 
         preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
         preferencesEditor = preferences.edit();
 
         if (getStudentStatsRequestStatus == RequestStatus.COMPLETED
-                && getStudentMainDataRequestStatus    == RequestStatus.COMPLETED
-                && getExercisesByDayRequestStatus     == RequestStatus.COMPLETED
-//                && getFinalMarksRequestStatus         == RequestStatus.COMPLETED
-//                && getAllFinalMarksRequestStatus      == RequestStatus.COMPLETED
-//                && ratingRequestStatus                == RequestStatus.COMPLETED
-                && getStudentProfileDataRequestStatus == RequestStatus.COMPLETED
+                && getStudentMainDataRequestStatus     == RequestStatus.COMPLETED
+                && getExercisesByDayRequestStatus      == RequestStatus.COMPLETED
+//                && getFinalMarksRequestStatus        == RequestStatus.COMPLETED
+//                && getAllFinalMarksRequestStatus     == RequestStatus.COMPLETED
+                && ratingRequestStatus                 == RequestStatus.COMPLETED
+                && getStudentAchievementsRequestStatus == RequestStatus.COMPLETED
+                && getStudentProfileDataRequestStatus  == RequestStatus.COMPLETED
         ) {
             isAuth = true;
 
@@ -1116,6 +1306,7 @@ public class MainActivity extends AppCompatActivity {
         getFinalMarksRequestStatus            = RequestStatus.NOT_CALLED;
         getAllFinalMarksRequestStatus         = RequestStatus.NOT_CALLED;
         ratingRequestStatus                   = RequestStatus.NOT_CALLED;
+        getStudentAchievementsRequestStatus   = RequestStatus.NOT_CALLED;
     }
 
     public void resetApp() {
@@ -1324,6 +1515,13 @@ public class MainActivity extends AppCompatActivity {
         getScheduleInfoRequestStatus = RequestStatus.CALLED;
         scheduleInfoRequest = new GetScheduleInfoRequest();
         scheduleInfoRequest.execute();
+    }
+
+    private void sendGetStudentAchievementsRequest() {
+
+        getStudentAchievementsRequestStatus = RequestStatus.CALLED;
+        achievementsRequest = new GetStudentAchievementsRequest();
+        achievementsRequest.execute();
     }
 
     // Колбеки, которые вызываются при завершении определенного запроса
@@ -3042,9 +3240,27 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    public void onGetStudentAchievementsRequestCompleted(String response) {
+
+//        System.out.println(response);
+
+        if (getStudentAchievementsRequestStatus == RequestStatus.COMPLETED) {
+            try {
+                studentAchievements = new JSONArray(response);
+                System.out.println(studentAchievements.toString(2));
+
+            } catch (JSONException e) {
+                System.out.println(e.toString());
+            }
+        } else if (getStudentAchievementsRequestStatus == RequestStatus.TIMEOUT) {
+
+        } else if (getStudentAchievementsRequestStatus == RequestStatus.FAILED) {
+
+        }
+    }
+
     // Сами асинхронные запросы
 
-    // [name, password]
     class LoginRequest extends AsyncTask<String[], String, String[]>  {
 
 //        @Override
@@ -3104,7 +3320,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // [year, month]
     class GetStudentMainDataRequest extends AsyncTask<String[], String, String> {
 
 //        @Override
@@ -3167,7 +3382,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // [lessonId]
     class GetExercisesByLessonRequest extends AsyncTask <String[], String, String[]> {
 
         @Override
@@ -3212,7 +3426,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // [date <yyyy-mm-dd>]
     class GetExercisesByDayRequest extends AsyncTask <String[], String, String> {
 
 //        @Override
@@ -3261,7 +3474,6 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
-    // [postsCount]
     class GetVKWallPostsRequest extends AsyncTask <String[], String, String> {
 
 //        @Override
@@ -4179,7 +4391,69 @@ public class MainActivity extends AppCompatActivity {
         }
     }
 
+    class GetStudentAchievementsRequest extends AsyncTask<String[], String, String> {
 
+//        @Override
+//        protected void onPreExecute() {
+//            super.onPreExecute();
+//        }
+
+        @Override
+        protected void onProgressUpdate(String... values) {
+            super.onProgressUpdate(values);
+            loadingLog("Получение данных о достижениях");
+        }
+
+        protected String doInBackground(String[]... params) { // params[0][0] - year, params[0][1] - month
+
+            publishProgress("");
+
+            HttpURLConnection urlConnection = null;
+            String responseBody = "";
+
+
+            // создаем мап для картинки
+//            if (getStudentProfileDataRequestStatus == RequestStatus.COMPLETED) {
+//                try {
+//                    studentAvatarBitmap = BitmapFactory.decodeStream((InputStream) new URL("https://ifspo.ifmo.ru" + studentAvatarSrc).getContent());
+//                } catch (MalformedURLException e) {
+//                    e.printStackTrace();
+//                } catch (IOException e) {
+//                    e.printStackTrace();
+//                }
+//            }
+
+            try {
+                preferences = MainActivity.this.getPreferences(Context.MODE_PRIVATE);
+                String currentAdress = preferences.getString("studentName", "");
+
+                String url_address = "https://spoconnection-rating-server.herokuapp.com/achievements"
+                        + "?name=" + currentAdress;
+
+                urlConnection = Functions.setupGETAuthRequest(url_address, authCookie, MAIN_DATA_REQUEST_CONNECT_TIMEOUT, MAIN_DATA_REQUEST_READ_TIMEOUT);
+                responseBody = Functions.getResponseFromGetRequest(urlConnection);
+                getStudentAchievementsRequestStatus = RequestStatus.COMPLETED;
+
+            } catch (SocketTimeoutException e) {
+                System.out.println("Achievements request timeout!");
+                getStudentAchievementsRequestStatus = RequestStatus.TIMEOUT;
+                return "";
+            } catch (Exception e) {
+//                System.out.println("Problems with main data request request");
+                System.out.println(e.toString());
+                getStudentAchievementsRequestStatus = RequestStatus.FAILED;
+                return "";
+            } finally {
+                if (urlConnection != null) urlConnection.disconnect();
+            }
+            return responseBody;
+        }
+
+        protected void onPostExecute(String result) {
+            super.onPostExecute(result);
+            onGetStudentAchievementsRequestCompleted(result);
+        }
+    }
 
 
 
@@ -4293,66 +4567,67 @@ public class MainActivity extends AppCompatActivity {
                 scheduleNavImg.setImageResource(R.drawable.schedule);
                 scheduleNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 scheduleNavText.setShadowLayer(0,0,0,0);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                teachersScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+                teachersList.removeView(loadingScreen);
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                teachersScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(teachersScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case PROFILE: {
                 profileNavImg.setImageResource(R.drawable.profile);
                 profileNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 profileNavText.setShadowLayer(0,0,0,0);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                profileScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                profileScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(profileScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case HOME: {
                 homeNavImg.setImageResource(R.drawable.main);
                 homeNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 homeNavText.setShadowLayer(0,0,0,0);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                homeScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                homeScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(homeScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case TEACHERSCHEDULE: {
@@ -4366,22 +4641,23 @@ public class MainActivity extends AppCompatActivity {
                 scheduleNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 scheduleNavText.setShadowLayer(0,0,0,0);
                 teacherScheduleList.removeView(errorScreen);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                teacherScheduleScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+                teacherScheduleList.removeView(loadingScreen);
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                teacherScheduleScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(teacherScheduleScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case SCHEDULE: {
@@ -4389,44 +4665,45 @@ public class MainActivity extends AppCompatActivity {
                 scheduleNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 scheduleNavText.setShadowLayer(0,0,0,0);
                 scheduleListError.removeView(errorScreen);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                scheduleScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+                scheduleListError.removeView(loadingScreen);
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                scheduleScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(scheduleScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case LESSONS: {
                 lessonsNavImg.setImageResource(R.drawable.subject);
                 lessonsNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 lessonsNavText.setShadowLayer(0,0,0,0);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                lessonsScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                lessonsScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(lessonsScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case LESSONS_INFORMATION: {
@@ -4435,22 +4712,22 @@ public class MainActivity extends AppCompatActivity {
                 lessonsNavText.setShadowLayer(0,0,0,0);
 //                LinearLayout lessonsInfoList = findViewById(R.id.lessonsInformationList);
                 lessonsInfoList.removeView(errorScreen);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                lessonsInformationScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                lessonsInformationScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(lessonsInformationScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case NOTIFICATION: {
@@ -4459,44 +4736,46 @@ public class MainActivity extends AppCompatActivity {
                 notificationNavText.setShadowLayer(0,0,0,0);
 //                LinearLayout notList = findViewById(R.id.notificationList);
                 notList.removeView(errorScreen);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                notificationListScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+                notList.removeView(loadingScreen);
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                notificationListScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(notificationListScreen);
-                            }
-                        });
-                    }
-                }, 200);
+
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case SETTINGS: {
                 settingsNavImg.setImageResource(R.drawable.settings);
                 settingsNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 settingsNavText.setShadowLayer(0,0,0,0);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                settingsScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                settingsScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(settingsScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case ITOG: {
@@ -4505,44 +4784,45 @@ public class MainActivity extends AppCompatActivity {
                 lessonsNavText.setShadowLayer(0,0,0,0);
 //                LinearLayout itogList = findViewById(R.id.itogList);
                 itogList.removeView(errorScreen);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                itogScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+                itogList.removeView(loadingScreen);
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                itogScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(itogScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case BACKCONNECT: {
                 settingsNavImg.setImageResource(R.drawable.settings);
                 settingsNavText.setTextColor(getResources().getColor(R.color.greyColor));
                 settingsNavText.setShadowLayer(0,0,0,0);
-                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
-                anim.setDuration(200);
-                anim.setStartOffset(0);
-                backConnectScreen.startAnimation(anim);
-                Timer timer = new Timer();
-                timer.schedule(new TimerTask() {
-                    @Override
-                    public void run() {
-                        MainActivity.this.runOnUiThread(new Runnable() {
-                            @Override
-                            public void run() {
+//                AlphaAnimation anim = new AlphaAnimation(1.0f, 0.0f);
+//                anim.setDuration(200);
+//                anim.setStartOffset(0);
+//                backConnectScreen.startAnimation(anim);
+//                Timer timer = new Timer();
+//                timer.schedule(new TimerTask() {
+//                    @Override
+//                    public void run() {
+//                        MainActivity.this.runOnUiThread(new Runnable() {
+//                            @Override
+//                            public void run() {
                                 main.removeView(backConnectScreen);
-                            }
-                        });
-                    }
-                }, 200);
+//                            }
+//                        });
+//                    }
+//                }, 200);
                 break;
             }
             case LOGIN: {
@@ -5015,11 +5295,11 @@ public class MainActivity extends AppCompatActivity {
             @Override
             public void onClick(View v) {
                 dialogCounter++;
-                if (dialogCounter == 5) setContainer(ContainerName.LESSONS);
-                if (dialogCounter == 7) setContainer(ContainerName.SETTINGS);
-                if (dialogCounter == 9) setContainer(ContainerName.HOME);
-                if (dialogCounter == 12) setContainer(ContainerName.NOTIFICATION);
-                if (dialogCounter == 13) setContainer(ContainerName.SCHEDULE);
+//                if (dialogCounter == 5) setContainer(ContainerName.LESSONS);
+//                if (dialogCounter == 7) setContainer(ContainerName.SETTINGS);
+//                if (dialogCounter == 9) setContainer(ContainerName.HOME);
+//                if (dialogCounter == 12) setContainer(ContainerName.NOTIFICATION);
+//                if (dialogCounter == 13) setContainer(ContainerName.SCHEDULE);
                 dialog.dismiss();
                 if (dialogCounter < 14) {
                     Timer dialogTimer = new Timer();
